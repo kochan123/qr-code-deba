@@ -15,9 +15,24 @@
       background:var(--bg); overflow:hidden;
       font-family:system-ui,sans-serif;
     }
-    #debaLogo{ width:min(720px,88vw); height:auto; margin-bottom:14px; user-select:none; }
-    canvas{ width:min(420px,80vw); height:min(420px,80vw); touch-action:manipulation; }
-    #hint{ margin-top:10px; font-size:14px; opacity:.6; user-select:none; }
+
+    #debaLogo{
+      width:min(720px,88vw);
+      height:auto;
+      margin-bottom:14px;
+      user-select:none;
+      -webkit-user-drag:none;
+    }
+
+    /* Responsive canvas: fills available space under the logo */
+    canvas{
+      width: min(90vw, 700px);
+      height: min(60vh, 520px);
+      max-width: 90vw;
+      max-height: 60vh;
+      touch-action: manipulation;
+    }
+
     #status{
       position:fixed; bottom:10px; left:10px;
       font-size:12px; opacity:.75;
@@ -27,7 +42,6 @@
     }
   </style>
 
-  <!-- THIS fixes “specifier 'three' was a bare specifier” -->
   <script type="importmap">
   {
     "imports": {
@@ -41,7 +55,6 @@
 <body>
   <img id="debaLogo" src="assets/deba.png" alt="Деба">
   <canvas id="pig"></canvas>
-  <!-- <div id="hint">tap = turbo 🐷</div> -->
   <div id="status">booting…</div>
 
   <script type="module">
@@ -70,13 +83,44 @@
     key.position.set(2,2,2);
     scene.add(key);
 
+    let pig = null;
+
+    function fitCameraToObject(object, fitOffset = 1.25) {
+      const box = new THREE.Box3().setFromObject(object);
+      const size = box.getSize(new THREE.Vector3());
+      const center = box.getCenter(new THREE.Vector3());
+
+      // center model at origin
+      object.position.sub(center);
+
+      const maxDim = Math.max(size.x, size.y, size.z);
+
+      // pick limiting axis based on aspect ratio
+      const fov = THREE.MathUtils.degToRad(camera.fov);
+      const aspect = camera.aspect;
+
+      const distV = (maxDim / 2) / Math.tan(fov / 2);
+      const fovH = 2 * Math.atan(Math.tan(fov / 2) * aspect);
+      const distH = (maxDim / 2) / Math.tan(fovH / 2);
+
+      const dist = Math.max(distV, distH) * fitOffset;
+
+      camera.position.set(0, maxDim * 0.12, dist);
+      camera.near = dist / 100;
+      camera.far = dist * 100;
+      camera.updateProjectionMatrix();
+    }
+
     function resize(){
       const r = canvas.getBoundingClientRect();
       const w = Math.max(1, Math.floor(r.width));
       const h = Math.max(1, Math.floor(r.height));
       renderer.setSize(w, h, false);
+
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
+
+      if (pig) fitCameraToObject(pig);
     }
     addEventListener("resize", resize);
 
@@ -86,58 +130,38 @@
     draco.setDecoderPath("https://www.gstatic.com/draco/v1/decoders/");
     loader.setDRACOLoader(draco);
 
-    let pig = null;
-
     statusEl.textContent = "loading pig…";
 
     loader.load(
       "assets/pig.glb",
       (gltf) => {
         pig = gltf.scene;
-
-        // center model
-        const box = new THREE.Box3().setFromObject(pig);
-        const size = box.getSize(new THREE.Vector3());
-        const center = box.getCenter(new THREE.Vector3());
-        pig.position.sub(center);
-
-        // fit camera
-        const maxDim = Math.max(size.x, size.y, size.z);
-        const fov = camera.fov * (Math.PI / 180);
-        let dist = (maxDim / 2) / Math.tan(fov / 2);
-        dist *= 1.4;
-
-        camera.position.set(0, maxDim * 0.15, dist);
-        camera.near = dist / 100;
-        camera.far = dist * 100;
-        camera.updateProjectionMatrix();
-
         scene.add(pig);
-        statusEl.textContent = ""; // success
+
+        // Fit immediately, and again after resize
         resize();
+        fitCameraToObject(pig);
+
+        statusEl.textContent = "";
       },
       undefined,
       (err) => fail(err)
     );
 
-    // // spin + turbo
-    // let base = 0.03, turbo = 0;
-    // addEventListener("pointerdown", () => turbo = Math.min(turbo + 0.12, 0.40));
+    function animate(){
+      requestAnimationFrame(animate);
 
-function animate(){
-  requestAnimationFrame(animate);
+      if (pig) {
+        const t = performance.now() * 0.001;
 
-  if (pig) {
-    const t = performance.now() * 0.001;
+        // "oiia oiia" vibe: steady spin + rhythmic wobble
+        pig.rotation.y = t * 2.2;                  // constant spin
+        pig.rotation.z = Math.sin(t * 6.0) * 0.25; // wobble tilt
+        pig.position.y = Math.sin(t * 6.0) * 0.05; // tiny bounce
+      }
 
-    // "oiia oiia" vibe: steady spin + rhythmic wobble
-    pig.rotation.y = t * 2.2;                 // constant spin
-    pig.rotation.z = Math.sin(t * 6.0) * 0.25; // wobble tilt
-    pig.position.y = Math.sin(t * 6.0) * 0.05; // tiny bounce
-  }
-
-  renderer.render(scene, camera);
-}
+      renderer.render(scene, camera);
+    }
 
     resize();
     animate();
