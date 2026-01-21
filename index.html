@@ -9,7 +9,7 @@
 <style>
 :root{
   --bg:#DDE6B5;
-  --pink: rgba(230, 140, 200, 0.85);
+  --pink: rgba(235, 145, 205, 0.88);
 }
 
 body{
@@ -36,18 +36,16 @@ body{
   -webkit-user-drag:none;
 }
 
-/* TEXT CRAWL */
+/* CRAWL */
 #crawlArea{
   position:fixed;
   inset:0;
   overflow:hidden;
   z-index:2;
 }
-
 #crawl{
   position:absolute;
   left:50%;
-  bottom:-120%;
   transform:translateX(-50%);
   width:min(900px,92vw);
   color:var(--pink);
@@ -59,21 +57,24 @@ body{
   text-shadow:
     0 1px 0 rgba(0,0,0,0.05),
     0 0 10px rgba(180,70,150,0.18);
+  opacity:0;              /* HIDDEN until music plays */
+  transition: opacity .8s ease;
 }
 
-/* UwU unlock */
+/* UWU unlock */
 #uwu{
   position:fixed;
   inset:0;
-  display:none;
+  display:none;           /* only shown if autoplay fails */
   align-items:center;
   justify-content:center;
   font-size:34px;
   font-weight:900;
-  color:rgba(40,40,40,0.8);
+  color:rgba(40,40,40,0.82);
   cursor:pointer;
   z-index:10;
   user-select:none;
+  background:rgba(0,0,0,0.0);
 }
 
 /* status */
@@ -116,28 +117,28 @@ const statusEl = document.getElementById("status");
 music.volume = 1.0;
 
 let textReady = false;
-let playing = false;
-let durationMs = 203000; // fallback 3:23
-let startTime = 0;
+let started = false;
+let durationMs = 203000; // fallback
 let raf = null;
 
-/* LOAD TEXT */
+/* load text BUT keep it invisible until music actually plays */
 fetch("assets/text.txt")
   .then(r => r.text())
   .then(t => {
     crawl.textContent = t.trim();
     textReady = true;
-    statusEl.textContent = "text loaded";
+    statusEl.textContent = "ready";
+  })
+  .catch(() => {
+    crawl.textContent = "failed to load assets/text.txt";
+    textReady = true;
+    statusEl.textContent = "ready (no text)";
   });
 
-/* AUDIO METADATA */
 music.addEventListener("loadedmetadata", ()=>{
-  if (isFinite(music.duration) && music.duration > 1) {
-    durationMs = music.duration * 1000;
-  }
+  if (isFinite(music.duration) && music.duration > 1) durationMs = music.duration * 1000;
 });
 
-/* START SCROLL */
 function startScroll(){
   cancelAnimationFrame(raf);
 
@@ -147,49 +148,68 @@ function startScroll(){
   const startY = screenH + 40;
   const endY   = -textH - 40;
 
-  startTime = performance.now() - (music.currentTime * 1000);
+  // show crawl only now (music is playing)
+  crawl.style.opacity = "1";
 
   function step(){
+    // sync to audio time
     const tMs = (music.currentTime * 1000) % durationMs;
     const p = tMs / durationMs;
     const y = startY + (endY - startY) * p;
-    crawl.style.bottom = "auto";
+
     crawl.style.top = `${y}px`;
     raf = requestAnimationFrame(step);
   }
   raf = requestAnimationFrame(step);
 }
 
-/* TRY AUTOPLAY */
-async function tryPlay(){
-  if (playing || !textReady) return;
+function hideUwu(){
+  uwu.style.display = "none";
+}
+
+function showUwu(){
+  uwu.style.display = "flex";
+}
+
+async function tryStart(){
+  if (started) return;
+  if (!textReady) { statusEl.textContent = "loading text…"; return; }
+
+  statusEl.textContent = "starting…";
+
   try{
-    await music.play();
-    playing = true;
-    uwu.style.display = "none";
+    await music.play();         // will throw if blocked
+    started = true;
+    hideUwu();
     statusEl.textContent = "music on";
     startScroll();
   }catch{
-    uwu.style.display = "flex";
+    // autoplay blocked -> show UwU and keep crawl hidden
+    showUwu();
+    crawl.style.opacity = "0";
     statusEl.textContent = "tap UwU";
   }
 }
 
-/* UNLOCK */
-uwu.addEventListener("pointerdown", tryPlay);
-window.addEventListener("keydown", tryPlay);
-window.addEventListener("pointerdown", tryPlay, { once:true });
-
-/* RESYNC ON VISIBILITY */
-document.addEventListener("visibilitychange", ()=>{
-  if (!document.hidden && music.paused){
-    playing = false;
-    tryPlay();
-  }
+/* only the UwU click starts it */
+uwu.addEventListener("pointerdown", ()=> {
+  tryStart();
 });
 
-/* INIT */
-window.addEventListener("load", tryPlay);
+/* attempt autoplay once on load (will fail on most browsers) */
+window.addEventListener("load", ()=> {
+  tryStart();
+});
+
+/* keep it aligned on resize */
+window.addEventListener("resize", ()=>{
+  if (started) startScroll();
+});
+
+/* if tab returns, try again */
+document.addEventListener("visibilitychange", ()=>{
+  if (!document.hidden && !started) tryStart();
+});
 </script>
 
 </body>
