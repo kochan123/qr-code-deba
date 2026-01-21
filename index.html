@@ -8,8 +8,8 @@
 
 <style>
 :root{
-  --bg:#D6E0AC;
-  --pink: rgba(220, 120, 190, 0.78);
+  --bg:#DDE6B5;
+  --pink: rgba(230, 140, 200, 0.85);
 }
 
 body{
@@ -21,13 +21,14 @@ body{
 }
 
 /* LOGO */
-#top{
-  position:absolute;
+#logoWrap{
+  position:fixed;
   top:20px;
   left:0; right:0;
   display:flex;
   justify-content:center;
-  z-index:3;
+  z-index:5;
+  pointer-events:none;
 }
 #debaLogo{
   width:min(720px,88vw);
@@ -35,32 +36,19 @@ body{
   -webkit-user-drag:none;
 }
 
-/* TEXT WINDOW (CLIPPED BELOW LOGO) */
-#middle{
-  position:absolute;
-  left:0; right:0;
-  bottom:0;
+/* TEXT CRAWL */
+#crawlArea{
+  position:fixed;
+  inset:0;
   overflow:hidden;
-  pointer-events:none;
   z-index:2;
 }
 
-#crawlWrap{
+#crawl{
   position:absolute;
-  left:0; right:0;
-  bottom:0;
-  display:flex;
-  justify-content:center;
-  transform: translateY(110%);
-  opacity:0;              /* start hidden */
-  transition: opacity 2.2s ease; /* gradual start */
-}
-
-#crawlWrap.show{
-  opacity:1;
-}
-
-.crawl{
+  left:50%;
+  bottom:-120%;
+  transform:translateX(-50%);
   width:min(900px,92vw);
   color:var(--pink);
   font-size:clamp(15px,2vw,24px);
@@ -70,10 +58,25 @@ body{
   white-space:pre-line;
   text-shadow:
     0 1px 0 rgba(0,0,0,0.05),
-    0 0 10px rgba(180,70,150,0.16);
+    0 0 10px rgba(180,70,150,0.18);
 }
 
-/* STATUS */
+/* UwU unlock */
+#uwu{
+  position:fixed;
+  inset:0;
+  display:none;
+  align-items:center;
+  justify-content:center;
+  font-size:34px;
+  font-weight:900;
+  color:rgba(40,40,40,0.8);
+  cursor:pointer;
+  z-index:10;
+  user-select:none;
+}
+
+/* status */
 #status{
   position:fixed;
   bottom:10px;
@@ -84,177 +87,109 @@ body{
   border-radius:10px;
   background:rgba(255,255,255,0.25);
   backdrop-filter: blur(8px);
-  z-index:5;
-}
-
-/* UWU OVERLAY */
-#uwu{
-  position:fixed;
-  inset:0;
-  display:none;
-  align-items:center;
-  justify-content:center;
-  font-size:32px;
-  font-weight:900;
-  color:rgba(40,40,40,0.82);
-  cursor:pointer;
-  z-index:10;
-  user-select:none;
+  z-index:20;
 }
 </style>
 </head>
 
 <body>
 
-<div id="top">
+<div id="logoWrap">
   <img id="debaLogo" src="assets/deba.png" alt="Деба">
 </div>
 
-<div id="middle">
-  <div id="crawlWrap">
-    <div class="crawl" id="crawlText"></div>
-  </div>
+<div id="crawlArea">
+  <div id="crawl"></div>
 </div>
 
-<div id="status">loading…</div>
 <div id="uwu">~ UwU ~</div>
+<div id="status">loading…</div>
 
-<audio id="bgm" src="assets/music.mp3" loop preload="auto"></audio>
+<audio id="music" src="assets/music.mp3" preload="auto" loop></audio>
 
 <script>
-const audio = document.getElementById("bgm");
+const crawl = document.getElementById("crawl");
+const music = document.getElementById("music");
 const uwu = document.getElementById("uwu");
 const statusEl = document.getElementById("status");
-const crawlText = document.getElementById("crawlText");
-const crawlWrap = document.getElementById("crawlWrap");
-const middle = document.getElementById("middle");
-const logo = document.getElementById("debaLogo");
 
-audio.volume = 1.0;
+music.volume = 1.0;
 
 let textReady = false;
-let audioReady = false;
-let running = false;
-
-let durationMs = 203000; // fallback
-let raf = null;
+let playing = false;
+let durationMs = 203000; // fallback 3:23
 let startTime = 0;
+let raf = null;
 
-function setMiddleTop(){
-  const r = logo.getBoundingClientRect();
-  middle.style.top = `${r.bottom + 20}px`;
-}
-
-/* Load text from assets/text.txt */
+/* LOAD TEXT */
 fetch("assets/text.txt")
   .then(r => r.text())
   .then(t => {
-    crawlText.textContent = t.trim();
+    crawl.textContent = t.trim();
     textReady = true;
-    statusEl.textContent = "text ok";
-    maybeStart();
-  })
-  .catch(() => {
-    crawlText.textContent = "failed to load assets/text.txt";
-    textReady = true;
-    maybeStart();
+    statusEl.textContent = "text loaded";
   });
 
-/* Wait for real audio duration */
-audio.addEventListener("loadedmetadata", ()=>{
-  if (isFinite(audio.duration) && audio.duration > 1) {
-    durationMs = audio.duration * 1000;
+/* AUDIO METADATA */
+music.addEventListener("loadedmetadata", ()=>{
+  if (isFinite(music.duration) && music.duration > 1) {
+    durationMs = music.duration * 1000;
   }
-  audioReady = true;
-  maybeStart();
 });
 
-function startCrawlSynced(){
+/* START SCROLL */
+function startScroll(){
   cancelAnimationFrame(raf);
-  setMiddleTop();
 
-  // force layout so heights are correct
-  const winH = middle.getBoundingClientRect().height;
-  const textH = crawlText.getBoundingClientRect().height;
+  const screenH = window.innerHeight;
+  const textH = crawl.getBoundingClientRect().height;
 
-  const startY = winH + 20;
+  const startY = screenH + 40;
   const endY   = -textH - 40;
 
-  // gradual reveal
-  crawlWrap.classList.remove("show");
-  crawlWrap.style.transform = `translateY(${startY}px)`;
+  startTime = performance.now() - (music.currentTime * 1000);
 
-  // sync to audio: startTime tracks the same timeline as audio currentTime
-  // if audio is at 0.0 it starts from the bottom; if not, it resumes correctly
-  startTime = performance.now() - (audio.currentTime * 1000);
-
-  // fade in after a tiny delay so it feels like “starts gradually”
-  setTimeout(()=> crawlWrap.classList.add("show"), 80);
-
-  function step(now){
-    // progress based on audio time so it stays locked even if browser stutters
-    const tMs = (audio.currentTime * 1000) % durationMs;
+  function step(){
+    const tMs = (music.currentTime * 1000) % durationMs;
     const p = tMs / durationMs;
-
     const y = startY + (endY - startY) * p;
-    crawlWrap.style.transform = `translateY(${y}px)`;
-
+    crawl.style.bottom = "auto";
+    crawl.style.top = `${y}px`;
     raf = requestAnimationFrame(step);
   }
   raf = requestAnimationFrame(step);
 }
 
-function maybeStart(){
-  if (running) return;
-  if (!textReady) return;
-
-  // We only start the crawl when audio is actually playing.
-  // If autoplay is blocked, you’ll see UwU.
-  tryPlay();
-}
-
+/* TRY AUTOPLAY */
 async function tryPlay(){
-  if (running) return;
-
+  if (playing || !textReady) return;
   try{
-    await audio.play();
+    await music.play();
+    playing = true;
     uwu.style.display = "none";
     statusEl.textContent = "music on";
-    running = true;
-
-    // Only now start crawl (synced)
-    startCrawlSynced();
+    startScroll();
   }catch{
     uwu.style.display = "flex";
     statusEl.textContent = "tap UwU";
   }
 }
 
-/* UwU is the unlock */
+/* UNLOCK */
 uwu.addEventListener("pointerdown", tryPlay);
 window.addEventListener("keydown", tryPlay);
 window.addEventListener("pointerdown", tryPlay, { once:true });
 
-/* Keep it aligned */
-window.addEventListener("resize", ()=>{
-  setMiddleTop();
-  if (running) startCrawlSynced();
-});
-
+/* RESYNC ON VISIBILITY */
 document.addEventListener("visibilitychange", ()=>{
-  if (!document.hidden && audio.paused) {
-    running = false;
+  if (!document.hidden && music.paused){
+    playing = false;
     tryPlay();
   }
 });
 
-/* Init */
-window.addEventListener("load", ()=>{
-  setMiddleTop();
-  // even if metadata isn't ready yet, tryPlay will run;
-  // crawl waits for audio actually playing
-  tryPlay();
-});
+/* INIT */
+window.addEventListener("load", tryPlay);
 </script>
 
 </body>
