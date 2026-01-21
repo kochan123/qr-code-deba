@@ -8,33 +8,78 @@
 
   <style>
     :root { --bg:#D6E0AC; }
+
     body{
       margin:0; height:100vh;
       display:flex; flex-direction:column;
       align-items:center; justify-content:center;
-      background:var(--bg); overflow:hidden;
+      background:var(--bg);
+      overflow:hidden;
       font-family:system-ui,sans-serif;
     }
+
     #debaLogo{
       width:min(720px,88vw);
       height:auto;
       margin-bottom:14px;
       user-select:none;
       -webkit-user-drag:none;
+      z-index: 2;
     }
+
     canvas{
       width: min(90vw, 700px);
       height: min(60vh, 520px);
       max-width: 90vw;
       max-height: 60vh;
       touch-action: manipulation;
+      z-index: 2;
     }
+
     #status{
       position:fixed; bottom:10px; left:10px;
       font-size:12px; opacity:.75;
       padding:6px 8px; border-radius:8px;
       background: rgba(255,255,255,0.35);
       user-select:none;
+      z-index: 3;
+    }
+
+    /* --- Star Wars style crawl --- */
+    .crawlWrap{
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      display: flex;
+      justify-content: center;
+      align-items: flex-end;
+      perspective: 700px;
+      z-index: 1;
+      -webkit-mask-image: linear-gradient(to top, transparent 0%, black 12%, black 70%, transparent 100%);
+              mask-image: linear-gradient(to top, transparent 0%, black 12%, black 70%, transparent 100%);
+    }
+
+    .crawl{
+      width: min(900px, 92vw);
+      color: rgba(40,40,40,0.55);
+      font-weight: 600;
+      line-height: 1.5;
+      text-align: center;
+      letter-spacing: 0.5px;
+      transform-origin: 50% 100%;
+      transform: rotateX(55deg) translateY(70vh);
+
+      /* 3:23 = 203 seconds */
+      animation: crawlMove 203s linear infinite;
+
+      text-shadow: 0 1px 0 rgba(255,255,255,0.15);
+      font-size: clamp(14px, 2.1vw, 22px);
+      white-space: pre-line;
+    }
+
+    @keyframes crawlMove{
+      0%   { transform: rotateX(55deg) translateY(70vh); }
+      100% { transform: rotateX(55deg) translateY(-260vh); }
     }
   </style>
 
@@ -49,6 +94,58 @@
 </head>
 
 <body>
+  <div class="crawlWrap" aria-hidden="true">
+    <div class="crawl">
+Словото, словото на мечовете
+Словото е словото на мечовете… за да бъдат възстановени несправедливостите
+Дори низките се надигнаха… пратеникът на решителните
+
+Словото, словото на мечовете
+Словото е словото на мечовете… за да бъдат възстановени несправедливостите
+Дори низките се надигнаха… пратеникът на решителните
+
+Словото, словото на мечовете
+Словото е словото на мечовете… за да бъдат възстановени несправедливостите
+Дори низките се надигнаха… пратеникът на решителните
+
+Не можаха да осквернят светилището ми… дори лъвове да ги обкръжаваха
+Утайката на потисничеството нападна… къде е заветът на решителните?
+Забравиха, че сме горди… защитаваме се като яростните
+Ние сме онези, които стъпкаха… трона на чужденците с коне
+
+С коне – трона на чужденците
+
+Словото, словото – мечовете
+Словото е словото на мечовете… за да бъдат възстановени несправедливостите
+Дори низките се надигнаха… пратеникът на решителните
+
+Словото е словото на мечовете
+Словото е словото на мечовете… за да бъдат възстановени несправедливостите
+Дори низките се надигнаха… пратеникът на решителните
+
+Словото е словото на мечовете
+Словото е словото на мечовете… за да бъдат възстановени несправедливостите
+Дори низките се надигнаха… пратеникът на решителните
+
+Ние сме онези, които градиха… крепостите си от черепи
+Прогонихме царя на Хосрой… с камшик като военна плячка
+Нашият пратеник е създаден от нас… строители на благородна слава
+Нашият пратеник е слънцето на истината… осветил лицето на световете
+Словото е словото на мечовете… за да бъдат възстановени несправедливостите
+Дори низките се надигнаха… пратеникът на народа на решимостта
+
+Словото, словото на мечовете
+Словото е словото на мечовете… за да бъдат възстановени несправедливостите
+Дори низките се надигнаха… пратеникът на народа на решимостта
+
+Словото, словото на мечовете
+Словото е словото на мечовете… за да бъдат възстановени несправедливостите
+Дори низките се надигнаха… пратеникът на народа на решимостта
+
+Словото, словото на мечовете
+    </div>
+  </div>
+
   <img id="debaLogo" src="assets/deba.png" alt="Деба">
   <canvas id="pig"></canvas>
   <div id="status">booting…</div>
@@ -84,7 +181,7 @@
     const tmpSize = new THREE.Vector3();
     const tmpCenter = new THREE.Vector3();
 
-    function fitCameraToObject(object, fitOffset = 1.45) {
+    function fitCameraToObject(object, fitOffset = 1.65) {
       tmpBox.setFromObject(object);
       tmpBox.getSize(tmpSize);
       tmpBox.getCenter(tmpCenter);
@@ -92,14 +189,12 @@
       object.position.sub(tmpCenter);
 
       const maxDim = Math.max(tmpSize.x, tmpSize.y, tmpSize.z);
-
       const fov = THREE.MathUtils.degToRad(camera.fov);
       const aspect = camera.aspect;
 
       const distV = (maxDim / 2) / Math.tan(fov / 2);
       const fovH = 2 * Math.atan(Math.tan(fov / 2) * aspect);
       const distH = (maxDim / 2) / Math.tan(fovH / 2);
-
       const dist = Math.max(distV, distH) * fitOffset;
 
       camera.position.set(0, maxDim * 0.10, dist);
@@ -127,10 +222,9 @@
     loader.setDRACOLoader(draco);
 
     // === TUNE HERE ===
-    const BPM = 145;            // loop speed
-    const squashAmt = 0.55;     // MORE aggressive stretch/squash
-    const bounceY = 0.00;       // no vertical wiggle
-    const rotateSpeed = 0.55;   // constant center rotation (radians/sec)
+    const BPM = 145;
+    const squashAmt = 0.55;
+    const rotateSpeed = 0.55;
 
     const basePos = new THREE.Vector3();
     const baseScale = new THREE.Vector3(1,1,1);
@@ -158,7 +252,6 @@
       (err) => fail(err)
     );
 
-    // smooth looping pulse
     function smoothPulse(x){
       return 0.5 - 0.5 * Math.cos(x * Math.PI * 2);
     }
@@ -169,32 +262,22 @@
       if (pig) {
         const t = performance.now() * 0.001;
         const beat = 60 / BPM;
-        const phase = (t / beat) % 1;   // 0..1
-        const p = smoothPulse(phase);   // 0..1
+        const phase = (t / beat) % 1;
+        const p = smoothPulse(phase);
 
-        // p=0 squashed (wide), p=1 stretched (tall)
         const stretch = p * squashAmt;
 
-        // Wider when squashed, taller when stretched
-        const sx = 1 + (squashAmt - stretch) * 1.25; // OUT more
-        const sy = 1 + stretch * 1.90;               // UP more
-        const sz = 1 + (squashAmt - stretch) * 1.25; // OUT more
+        const sx = 1 + (squashAmt - stretch) * 1.25;
+        const sy = 1 + stretch * 1.90;
+        const sz = 1 + (squashAmt - stretch) * 1.25;
 
-        pig.scale.set(
-          baseScale.x * sx,
-          baseScale.y * sy,
-          baseScale.z * sz
-        );
+        pig.scale.set(baseScale.x * sx, baseScale.y * sy, baseScale.z * sz);
+        pig.position.set(basePos.x, basePos.y, basePos.z);
 
-        // keep centered (no wiggle)
-        pig.position.set(basePos.x, basePos.y + bounceY, basePos.z);
-
-        // simple center rotation only
         e.set(0, t * rotateSpeed, 0);
         pig.quaternion.copy(baseQuat).multiply(new THREE.Quaternion().setFromEuler(e));
 
-        // avoid clipping when values are aggressive
-        if ((t % 0.5) < 0.02) fitCameraToObject(pig, 1.55);
+        if ((t % 0.5) < 0.02) fitCameraToObject(pig, 1.65);
       }
 
       renderer.render(scene, camera);
