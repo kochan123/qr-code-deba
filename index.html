@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Деба</title>
   <meta name="robots" content="noindex, nofollow" />
+
   <style>
     :root { --bg:#D6E0AC; }
     body{
@@ -14,50 +15,62 @@
       background:var(--bg); overflow:hidden;
       font-family:system-ui,sans-serif;
     }
-    #debaLogo{ width:min(720px,88vw); height:auto; margin-bottom:14px; }
-    canvas{ width:min(420px,80vw); height:min(420px,80vw); }
-    #hint{ margin-top:10px; font-size:14px; opacity:.6; }
-    #status{ position:fixed; bottom:10px; left:10px; font-size:12px; opacity:.65; }
+    #debaLogo{ width:min(720px,88vw); height:auto; margin-bottom:14px; user-select:none; }
+    canvas{ width:min(420px,80vw); height:min(420px,80vw); touch-action:manipulation; }
+    #hint{ margin-top:10px; font-size:14px; opacity:.6; user-select:none; }
+    #status{
+      position:fixed; bottom:10px; left:10px;
+      font-size:12px; opacity:.75;
+      padding:6px 8px; border-radius:8px;
+      background: rgba(255,255,255,0.35);
+      user-select:none;
+    }
   </style>
+
+  <!-- THIS fixes “specifier 'three' was a bare specifier” -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.158.0/examples/jsm/"
+    }
+  }
+  </script>
 </head>
+
 <body>
   <img id="debaLogo" src="assets/deba.png" alt="Деба">
   <canvas id="pig"></canvas>
   <div id="hint">tap = turbo 🐷</div>
-  <div id="status"></div>
+  <div id="status">booting…</div>
 
-<script type="module">
-  const statusEl = document.getElementById("status");
-  const canvas = document.getElementById("pig");
+  <script type="module">
+    import * as THREE from "three";
+    import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+    import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 
-  function fail(e) {
-    console.error(e);
-    statusEl.textContent = "ERROR: " + (e?.message || e);
-    statusEl.style.color = "crimson";
-  }
+    const statusEl = document.getElementById("status");
+    const canvas = document.getElementById("pig");
 
-  async function main() {
-    statusEl.textContent = "loading three.js...";
-
-    // Dynamic imports so we can catch failures
-    const THREE = await import("https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.module.js");
-    const { GLTFLoader } = await import("https://cdn.jsdelivr.net/npm/three@0.158.0/examples/jsm/loaders/GLTFLoader.js");
-    const { DRACOLoader } = await import("https://cdn.jsdelivr.net/npm/three@0.158.0/examples/jsm/loaders/DRACOLoader.js");
-
-    statusEl.textContent = "three.js loaded, loading pig...";
+    function fail(e){
+      console.error(e);
+      statusEl.textContent = "ERROR: " + (e?.message || e);
+      statusEl.style.color = "crimson";
+    }
 
     const scene = new THREE.Scene();
-    const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+
+    const renderer = new THREE.WebGLRenderer({ canvas, alpha:true, antialias:true });
     renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
 
     const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 100000);
 
-    scene.add(new THREE.AmbientLight(0xffffff, 0.7));
-    const key = new THREE.DirectionalLight(0xffffff, 1.0);
-    key.position.set(2, 2, 2);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.75));
+    const key = new THREE.DirectionalLight(0xffffff, 1.1);
+    key.position.set(2,2,2);
     scene.add(key);
 
-    function resize() {
+    function resize(){
       const r = canvas.getBoundingClientRect();
       const w = Math.max(1, Math.floor(r.width));
       const h = Math.max(1, Math.floor(r.height));
@@ -67,6 +80,7 @@
     }
     addEventListener("resize", resize);
 
+    // Loaders (Draco enabled)
     const loader = new GLTFLoader();
     const draco = new DRACOLoader();
     draco.setDecoderPath("https://www.gstatic.com/draco/v1/decoders/");
@@ -74,17 +88,20 @@
 
     let pig = null;
 
+    statusEl.textContent = "loading pig…";
+
     loader.load(
       "assets/pig.glb",
       (gltf) => {
         pig = gltf.scene;
 
-        // center + fit camera
+        // center model
         const box = new THREE.Box3().setFromObject(pig);
         const size = box.getSize(new THREE.Vector3());
         const center = box.getCenter(new THREE.Vector3());
         pig.position.sub(center);
 
+        // fit camera
         const maxDim = Math.max(size.x, size.y, size.z);
         const fov = camera.fov * (Math.PI / 180);
         let dist = (maxDim / 2) / Math.tan(fov / 2);
@@ -105,9 +122,9 @@
 
     // spin + turbo
     let base = 0.03, turbo = 0;
-    addEventListener("pointerdown", () => turbo = Math.min(turbo + 0.1, 0.35));
+    addEventListener("pointerdown", () => turbo = Math.min(turbo + 0.12, 0.40));
 
-    function animate() {
+    function animate(){
       requestAnimationFrame(animate);
       turbo *= 0.92;
       if (pig) pig.rotation.y += (base + turbo);
@@ -116,10 +133,6 @@
 
     resize();
     animate();
-  }
-
-  main().catch(fail);
-</script>
-
+  </script>
 </body>
 </html>
