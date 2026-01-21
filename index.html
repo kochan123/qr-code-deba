@@ -97,31 +97,41 @@
     const loader = new THREE.GLTFLoader();
     statusEl.textContent = "loading pig...";
 
-    loader.load(
-      "assets/pig.glb",
-      (gltf) => {
-        pig = gltf.scene;
-        pig.rotation.y = Math.PI * 0.2;
+loader.load(
+  "assets/pig.glb",
+  (gltf) => {
+    pig = gltf.scene;
 
-        // tweak these if needed
-        pig.scale.set(1.2, 1.2, 1.2);
-        pig.position.y = -0.35;
+    // 1) Center the model at (0,0,0)
+    const box = new THREE.Box3().setFromObject(pig);
+    const size = box.getSize(new THREE.Vector3());
+    const center = box.getCenter(new THREE.Vector3());
+    pig.position.sub(center);
 
-        scene.add(pig);
-        statusEl.textContent = "";
-        resize();
-      },
-      (xhr) => {
-        if (xhr.total) {
-          const pct = Math.round((xhr.loaded / xhr.total) * 100);
-          statusEl.textContent = `loading pig... ${pct}%`;
-        }
-      },
-      (err) => {
-        console.error(err);
-        statusEl.textContent = "pig failed to load (check assets/pig.glb path)";
-      }
-    );
+    // 2) Fit camera distance to model size
+    const maxDim = Math.max(size.x, size.y, size.z);
+    const fov = camera.fov * (Math.PI / 180);
+    let dist = (maxDim / 2) / Math.tan(fov / 2);
+
+    dist *= 1.4; // padding so it doesn't touch edges
+
+    camera.position.set(0, maxDim * 0.15, dist);
+    camera.near = dist / 100;
+    camera.far = dist * 100;
+    camera.updateProjectionMatrix();
+
+    // 3) Add it and render
+    scene.add(pig);
+    statusEl.textContent = "";
+    resize();
+  },
+  undefined,
+  (err) => {
+    console.error(err);
+    statusEl.textContent = "pig failed to load (check assets/pig.glb)";
+  }
+);
+
 
     // turbo spin
     let base = 0.012;
