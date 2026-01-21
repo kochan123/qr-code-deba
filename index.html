@@ -9,7 +9,12 @@
 <style>
 :root{
   --bg:#D6E0AC;
-  --crawl-color: rgba(170, 70, 140, 0.65);
+
+  /* light pink, a bit more pink than before */
+  --crawl-color: rgba(210, 90, 170, 0.62);
+
+  --logo-top: 20px;
+  --logo-safe-gap: 18px;  /* space under logo where text should stop */
 }
 
 body{
@@ -23,11 +28,12 @@ body{
 /* TOP: LOGO */
 #top{
   position:absolute;
-  top:20px;
+  top:var(--logo-top);
   left:0; right:0;
   display:flex;
   justify-content:center;
   z-index:3;
+  pointer-events:none;
 }
 #debaLogo{
   width:min(720px,88vw);
@@ -35,41 +41,44 @@ body{
   -webkit-user-drag:none;
 }
 
-/* MIDDLE: CRAWL */
+/* FLAT CRAWL AREA (bottom -> stops under logo) */
 #middle{
   position:absolute;
-  top:20%;
-  bottom:10%;
+  inset:0;
+  z-index:2;
+  pointer-events:none;
+}
+
+/* We animate this wrapper */
+#crawlWrap{
+  position:absolute;
   left:0; right:0;
+  bottom:0;
+
   display:flex;
   justify-content:center;
-  pointer-events:none;
-  perspective:700px;
-  z-index:2;
+
+  /* start off-screen until we start */
+  transform: translateY(110%);
 }
+
+/* the text itself */
 .crawl{
   width:min(900px,92vw);
   color:var(--crawl-color);
-  font-size:clamp(15px,2.1vw,24px);
-  font-weight:600;
+
+  font-size:clamp(15px,2.0vw,24px);
+  font-weight:650;
   line-height:1.6;
   text-align:center;
   white-space:pre-line;
 
-  transform-origin:50% 100%;
-  transform:rotateX(55deg) translateY(60vh);
-  animation:crawlMove 203s linear infinite;
-
   text-shadow:
     0 1px 0 rgba(0,0,0,0.05),
-    0 0 6px rgba(120,40,100,0.15);
-}
-@keyframes crawlMove{
-  from { transform:rotateX(55deg) translateY(60vh); }
-  to   { transform:rotateX(55deg) translateY(-240vh); }
+    0 0 10px rgba(180,70,150,0.18);
 }
 
-/* STATUS */
+/* status */
 #status{
   position:fixed;
   bottom:10px;
@@ -77,39 +86,67 @@ body{
   font-size:12px;
   opacity:.7;
   padding:6px 8px;
-  border-radius:8px;
-  background:rgba(255,255,255,0.35);
+  border-radius:10px;
+  background:rgba(255,255,255,0.28);
+  backdrop-filter: blur(8px);
   user-select:none;
   z-index:6;
 }
 
-/* AUDIO UNLOCK OVERLAY */
+/* AUDIO UNLOCK OVERLAY (nice, not ugly) */
 #unlock{
   position:fixed;
   inset:0;
   z-index:10;
-  display:none;            /* only shown if autoplay is blocked */
+  display:none;              /* show only if autoplay is blocked */
   align-items:center;
   justify-content:center;
-  background:rgba(0,0,0,0.0); /* set to 0.35 if you want dim */
+  background: radial-gradient(circle at center, rgba(0,0,0,0.18), rgba(0,0,0,0.0) 60%);
+}
+
+#unlockCard{
+  width:min(520px,88vw);
+  padding:18px 18px;
+  border-radius:18px;
+
+  background: rgba(255,255,255,0.14);
+  border: 1px solid rgba(255,255,255,0.28);
+  backdrop-filter: blur(14px);
+
+  box-shadow: 0 10px 40px rgba(0,0,0,0.16);
+  text-align:center;
+  user-select:none;
   cursor:pointer;
 }
-#unlockBox{
-  padding:14px 16px;
-  border-radius:14px;
-  background:rgba(255,255,255,0.55);
-  backdrop-filter: blur(6px);
-  font-weight:700;
-  color:#111;
-  user-select:none;
-  text-align:center;
+
+#unlockTitle{
+  font-weight:800;
+  letter-spacing:0.3px;
+  font-size:18px;
+  color: rgba(25,25,25,0.92);
 }
-#unlockSmall{
-  display:block;
+
+#unlockSub{
   margin-top:6px;
-  font-weight:500;
-  opacity:.75;
   font-size:12px;
+  opacity:0.75;
+  color: rgba(25,25,25,0.85);
+}
+
+#unlockHint{
+  margin-top:10px;
+  display:inline-block;
+  padding:10px 14px;
+  border-radius:999px;
+  background: rgba(210, 90, 170, 0.20);
+  border: 1px solid rgba(210, 90, 170, 0.35);
+  color: rgba(25,25,25,0.92);
+  font-weight:750;
+}
+
+/* optional: hide status on tiny screens */
+@media (max-width: 420px){
+  #status{ opacity:.55; }
 }
 </style>
 </head>
@@ -121,7 +158,8 @@ body{
 </div>
 
 <div id="middle">
-  <div class="crawl">
+  <div id="crawlWrap">
+    <div class="crawl" id="crawlText">
 Словото, словото на мечовете
 Словото е словото на мечовете… за да бъдат възстановени несправедливостите
 Дори низките се надигнаха… пратеникът на решителните
@@ -159,19 +197,19 @@ body{
 Нашият пратеник е слънцето на истината… осветил лицето на световете
 Словото е словото на мечовете… за да бъдат възстановени несправедливостите
 Дори низките се надигнаха… пратеникът на народа на решимостта
+    </div>
   </div>
 </div>
 
 <div id="status">ready</div>
 
-<!-- AUDIO -->
 <audio id="bgm" src="assets/music.mp3" loop preload="auto"></audio>
 
-<!-- shown only if autoplay is blocked -->
-<div id="unlock" aria-hidden="true">
-  <div id="unlockBox">
-    TAP ANYWHERE TO START 🔊
-    <span id="unlockSmall">(browser blocks autoplay)</span>
+<div id="unlock">
+  <div id="unlockCard" role="button" aria-label="Start audio">
+    <div id="unlockTitle">Пусни звука 🔊</div>
+    <div id="unlockSub">Браузърът блокира autoplay. Един tap и тръгва.</div>
+    <div id="unlockHint">TAP ANYWHERE</div>
   </div>
 </div>
 
@@ -179,42 +217,111 @@ body{
 const statusEl = document.getElementById("status");
 const audio = document.getElementById("bgm");
 const unlock = document.getElementById("unlock");
+const unlockCard = document.getElementById("unlockCard");
 
-audio.volume = 1.0; // max allowed by browser
+const crawlWrap = document.getElementById("crawlWrap");
+const crawlText = document.getElementById("crawlText");
+const logo = document.getElementById("debaLogo");
 
-async function tryPlay() {
-  try {
+audio.volume = 1.0; // max the browser allows
+
+let crawlRAF = null;
+let crawlStartTime = null;
+let crawlParams = null; // {startY, stopY, durationMs}
+
+/* Compute where the crawl should stop (just under the logo) */
+function computeCrawlParams(){
+  const logoRect = logo.getBoundingClientRect();
+  const textRect = crawlText.getBoundingClientRect();
+
+  // Start from below bottom (hidden)
+  const startY = window.innerHeight + 20;
+
+  // Stop position: under logo + gap
+  const stopY = logoRect.bottom + parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--logo-safe-gap")) || (logoRect.bottom + 18);
+
+  // Duration: match music length if metadata exists, else 203s
+  const fallbackSec = 203;
+  const durationSec = (isFinite(audio.duration) && audio.duration > 1) ? audio.duration : fallbackSec;
+  const durationMs = durationSec * 1000;
+
+  // Apply initial placement
+  crawlWrap.style.transform = `translateY(${startY}px)`;
+
+  crawlParams = { startY, stopY, durationMs };
+}
+
+function startCrawl(){
+  cancelAnimationFrame(crawlRAF);
+  crawlStartTime = performance.now();
+
+  computeCrawlParams();
+
+  function step(now){
+    const { startY, stopY, durationMs } = crawlParams;
+    const t = (now - crawlStartTime) % durationMs;
+    const p = t / durationMs;
+
+    // Linear move from startY -> (stopY - textHeight - extra)
+    // We want the text to scroll *through* and keep going upward,
+    // but not vanish instantly. So we move it until it has passed the stop line.
+    const textH = crawlText.getBoundingClientRect().height;
+
+    // End point: move so the bottom of text ends around stopY (then continues past)
+    // (More negative = farther up)
+    const endY = stopY - textH - 40;
+
+    const y = startY + (endY - startY) * p;
+    crawlWrap.style.transform = `translateY(${y}px)`;
+
+    crawlRAF = requestAnimationFrame(step);
+  }
+
+  crawlRAF = requestAnimationFrame(step);
+}
+
+/* Audio logic */
+async function tryPlay(){
+  try{
     await audio.play();
-    // success
     unlock.style.display = "none";
     statusEl.textContent = "music on";
-  } catch (e) {
-    // blocked until user gesture
+    startCrawl(); // crawl starts ONLY when audio successfully plays
+  }catch(e){
     unlock.style.display = "flex";
     statusEl.textContent = "tap to enable sound";
   }
 }
 
-// Try immediately (works only on some browsers/settings)
+// If duration loads later, recompute so crawl syncs better
+audio.addEventListener("loadedmetadata", () => {
+  if (!audio.paused) startCrawl();
+});
+
 tryPlay();
 
-// One-tap unlock: ANY tap/click anywhere
 function userGestureStart(){
   tryPlay();
 }
-unlock.addEventListener("pointerdown", userGestureStart);
-window.addEventListener("pointerdown", userGestureStart, { once:false });
-window.addEventListener("keydown", userGestureStart, { once:false });
 
-// Keep alive (some browsers pause background audio)
+// tap anywhere
+unlock.addEventListener("pointerdown", userGestureStart);
+unlockCard.addEventListener("pointerdown", userGestureStart);
+window.addEventListener("pointerdown", userGestureStart, { passive:true });
+window.addEventListener("keydown", userGestureStart);
+
+// keep alive (some browsers pause audio)
 setInterval(() => {
-  if (!document.hidden && audio.paused) {
-    tryPlay();
-  }
+  if (!document.hidden && audio.paused) tryPlay();
 }, 1500);
 
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden) tryPlay();
+});
+
+window.addEventListener("resize", () => {
+  // keep crawl aligned under logo on resize
+  if (!audio.paused) startCrawl();
 });
 </script>
 
