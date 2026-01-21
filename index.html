@@ -197,27 +197,25 @@ function showUwu(){ uwu.style.display = "flex"; }
 
 async function tryStart(){
   if (started) return;
-  if (!textReady) { statusEl.textContent = "loading text…"; return; }
+  if (!textReady) return;
 
-  statusEl.textContent = "starting…";
+  started = true;
 
-  try{
-    await music.play();
-    started = true;
+  // START TEXT IMMEDIATELY
+  crawl.style.opacity = "1";
+  startScroll();
 
-    // start text IMMEDIATELY
-    startScroll();
+  // spawn images slowly
+  document.body.classList.add("started");
 
-    // spawn images (slower via CSS transition)
-    document.body.classList.add("started");
-
+  // try audio in parallel (don't block visuals)
+  music.play().then(() => {
     hideUwu();
     statusEl.textContent = "music on";
-  }catch{
+  }).catch(() => {
     showUwu();
-    crawl.style.opacity = "0";
     statusEl.textContent = "tap UwU";
-  }
+  });
 }
 
 /* only UwU click starts it */
