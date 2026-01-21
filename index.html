@@ -89,7 +89,6 @@
       tmpBox.getSize(tmpSize);
       tmpBox.getCenter(tmpCenter);
 
-      // center model at origin
       object.position.sub(tmpCenter);
 
       const maxDim = Math.max(tmpSize.x, tmpSize.y, tmpSize.z);
@@ -127,20 +126,15 @@
     draco.setDecoderPath("https://www.gstatic.com/draco/v1/decoders/");
     loader.setDRACOLoader(draco);
 
-    // --- bounce params (edit these) ---
-    const BPM = 150;                // set this to match the song feel
-    const beat = (60 / BPM);        // seconds per beat
-    const bounceAmp = 0.15;         // vertical bounce amount
-    const tiltAmp = 0.22;           // side tilt
-    const nodAmp = 0.10;            // forward/back nod
-    const yawAmp = 0.18;            // small left/right twist
-    const squash = 0.10;            // squash/stretch strength
+    // === MEME TUNE HERE ===
+    const BPM = 130;          // faster/slower loop
+    const squashAmt = 0.28;   // 0.15 subtle, 0.28 meme, 0.40 insane
+    const bounceY = 0.03;     // set 0 to disable vertical move
+    const tilt = 0.05;        // set 0 to disable tilt wobble
 
-    // baseline pose saved after load
     const basePos = new THREE.Vector3();
     const baseScale = new THREE.Vector3(1,1,1);
     const baseQuat = new THREE.Quaternion();
-    const e = new THREE.Euler(0,0,0,"YXZ");
 
     statusEl.textContent = "loading pig…";
 
@@ -163,45 +157,55 @@
       (err) => fail(err)
     );
 
-    function easeOutQuad(x){ return 1 - (1 - x) * (1 - x); }
+    // smoothstep-ish for nice looping
+    function smoothPulse(x){
+      // x in [0..1]
+      // makes it linger at extremes a bit (meme feel)
+      return 0.5 - 0.5 * Math.cos(x * Math.PI * 2);
+    }
 
     function animate(){
       requestAnimationFrame(animate);
 
       if (pig) {
         const t = performance.now() * 0.001;
+        const beat = 60 / BPM;
+        const phase = (t / beat) % 1;          // 0..1
+        const p = smoothPulse(phase);          // 0..1
 
-        // phase within beat [0..1)
-        const p = (t / beat) % 1;
+        // p=0 -> squashed (wide), p=1 -> stretched (tall)
+        const stretch = p * squashAmt;         // 0..squashAmt
 
-        // "kick" bounce: quick up, slower down
-        const up = p < 0.25 ? (p / 0.25) : (1 - (p - 0.25) / 0.75);
-        const b = easeOutQuad(Math.max(0, up)); // 0..1
+        // Keep volume-ish consistent:
+        // tall: y up, x/z down a bit
+        // wide: y down, x/z up
+        const sx = 1 + (squashAmt - stretch) * 0.90;
+        const sy = 1 + stretch * 1.25;
+        const sz = 1 + (squashAmt - stretch) * 0.90;
 
-        // secondary smaller bounce to feel more alive
-        const b2 = (Math.sin(t * (Math.PI * 2) / (beat * 2)) + 1) * 0.5;
-
-        // position (only Y)
-        pig.position.set(basePos.x, basePos.y + b * bounceAmp + b2 * (bounceAmp * 0.25), basePos.z);
-
-        // tilt + nod + tiny yaw (all bounded, no chaos)
-        e.y = Math.sin(t * (Math.PI * 2) / (beat * 4)) * yawAmp;         // slow sway
-        e.z = Math.sin(t * (Math.PI * 2) / beat) * tiltAmp * 0.6;        // side tilt on beat
-        e.x = Math.cos(t * (Math.PI * 2) / beat) * nodAmp * 0.6;         // nod on beat
-
-        const q = new THREE.Quaternion().setFromEuler(e);
-        pig.quaternion.copy(baseQuat).multiply(q);
-
-        // squash/stretch synced to bounce
-        const s = 1 + (b * squash);
         pig.scale.set(
-          baseScale.x * (1 + b * (squash * 0.35)),
-          baseScale.y * (1 - b * (squash * 0.60)),
-          baseScale.z * (1 + b * (squash * 0.35))
+          baseScale.x * sx,
+          baseScale.y * sy,
+          baseScale.z * sz
         );
 
-        // keep framed if scale changes a lot
-        // (cheap: only occasionally)
+        // tiny up/down so it feels like it's "hitting" the floor
+        pig.position.set(
+          basePos.x,
+          basePos.y + Math.sin(phase * Math.PI * 2) * bounceY,
+          basePos.z
+        );
+
+        // optional tiny wobble
+        if (tilt !== 0) {
+          const wob = Math.sin(phase * Math.PI * 2) * tilt;
+          pig.quaternion.copy(baseQuat);
+          pig.rotateZ(wob);
+        } else {
+          pig.quaternion.copy(baseQuat);
+        }
+
+        // refit occasionally (prevents edge clipping if you crank values)
         if ((t % 1) < 0.02) fitCameraToObject(pig);
       }
 
