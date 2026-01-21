@@ -9,9 +9,7 @@
 <style>
 :root{
   --bg:#D6E0AC;
-  --crawl-color: rgba(210, 90, 170, 0.70); /* a bit more pink */
-  --logo-top: 20px;
-  --logo-gap: 18px; /* space under logo before text starts */
+  --pink: rgba(220, 120, 190, 0.75); /* light but visible pink */
 }
 
 body{
@@ -22,15 +20,14 @@ body{
   font-family:system-ui,sans-serif;
 }
 
-/* TOP: LOGO */
+/* LOGO */
 #top{
   position:absolute;
-  top:var(--logo-top);
+  top:20px;
   left:0; right:0;
   display:flex;
   justify-content:center;
   z-index:3;
-  pointer-events:none;
 }
 #debaLogo{
   width:min(720px,88vw);
@@ -38,15 +35,14 @@ body{
   -webkit-user-drag:none;
 }
 
-/* CRAWL WINDOW (clipped so it NEVER goes behind logo) */
+/* TEXT WINDOW (CLIPPED BELOW LOGO) */
 #middle{
   position:absolute;
   left:0; right:0;
   bottom:0;
-  top:0;                /* will be set by JS to logoBottom */
-  overflow:hidden;      /* THIS is the key */
-  z-index:2;
+  overflow:hidden;
   pointer-events:none;
+  z-index:2;
 }
 
 #crawlWrap{
@@ -55,23 +51,20 @@ body{
   bottom:0;
   display:flex;
   justify-content:center;
-  transform: translateY(110%);
+  transform: translateY(100%);
 }
 
 .crawl{
   width:min(900px,92vw);
-  color:var(--crawl-color);
-  font-size:clamp(15px,2.0vw,24px);
-  font-weight:650;
+  color:var(--pink);
+  font-size:clamp(15px,2vw,24px);
+  font-weight:600;
   line-height:1.6;
   text-align:center;
   white-space:pre-line;
-  text-shadow:
-    0 1px 0 rgba(0,0,0,0.05),
-    0 0 10px rgba(180,70,150,0.18);
 }
 
-/* status */
+/* STATUS */
 #status{
   position:fixed;
   bottom:10px;
@@ -80,55 +73,24 @@ body{
   opacity:.7;
   padding:6px 8px;
   border-radius:10px;
-  background:rgba(255,255,255,0.28);
+  background:rgba(255,255,255,0.25);
   backdrop-filter: blur(8px);
-  user-select:none;
-  z-index:6;
+  z-index:5;
 }
 
-/* AUDIO UNLOCK OVERLAY */
-#unlock{
+/* UWU OVERLAY */
+#uwu{
   position:fixed;
   inset:0;
-  z-index:10;
   display:none;
   align-items:center;
   justify-content:center;
-  background: radial-gradient(circle at center, rgba(0,0,0,0.18), rgba(0,0,0,0.0) 60%);
-}
-#unlockCard{
-  width:min(520px,88vw);
-  padding:18px 18px;
-  border-radius:18px;
-  background: rgba(255,255,255,0.14);
-  border: 1px solid rgba(255,255,255,0.28);
-  backdrop-filter: blur(14px);
-  box-shadow: 0 10px 40px rgba(0,0,0,0.16);
-  text-align:center;
-  user-select:none;
-  cursor:pointer;
-}
-#unlockTitle{
+  font-size:32px;
   font-weight:800;
-  letter-spacing:0.3px;
-  font-size:18px;
-  color: rgba(25,25,25,0.92);
-}
-#unlockSub{
-  margin-top:6px;
-  font-size:12px;
-  opacity:0.75;
-  color: rgba(25,25,25,0.85);
-}
-#unlockHint{
-  margin-top:10px;
-  display:inline-block;
-  padding:10px 14px;
-  border-radius:999px;
-  background: rgba(210, 90, 170, 0.20);
-  border: 1px solid rgba(210, 90, 170, 0.35);
-  color: rgba(25,25,25,0.92);
-  font-weight:750;
+  color:rgba(40,40,40,0.8);
+  cursor:pointer;
+  z-index:10;
+  user-select:none;
 }
 </style>
 </head>
@@ -141,148 +103,95 @@ body{
 
 <div id="middle">
   <div id="crawlWrap">
-    <div class="crawl" id="crawlText">
-Словото, словото на мечовете
-Словото е словото на мечовете… за да бъдат възстановени несправедливостите
-Дори низките се надигнаха… пратеникът на решителните
-
-Словото, словото на мечовете
-Словото е словото на мечовете… за да бъдат възстановени несправедливостите
-Дори низките се надигнаха… пратеникът на решителните
-
-Словото, словото на мечовете
-Словото е словото на мечовете… за да бъдат възстановени несправедливостите
-Дори низките се надигнаха… пратеникът на решителните
-
-Не можаха да осквернят светилището ми… дори лъвове да ги обкръжаваха
-Утайката на потисничеството нападна… къде е заветът на решителните?
-Забравиха, че сме горди… защитаваме се като яростните
-Ние сме онези, които стъпкаха… трона на чужденците с коне
-
-С коне – трона на чужденците
-
-Словото, словото – мечовете
-Словото е словото на мечовете… за да бъдат възстановени несправедливостите
-Дори низките се надигнаха… пратеникът на решителните
-
-Словото е словото на мечовете
-Словото е словото на мечовете… за да бъдат възстановени несправедливостите
-Дори низките се надигнаха… пратеникът на решителните
-
-Словото е словото на мечовете
-Словото е словото на мечовете… за да бъдат възстановени несправедливостите
-Дори низките се надигнаха… пратеникът на решителните
-    </div>
+    <div class="crawl" id="crawlText"></div>
   </div>
 </div>
 
-<div id="status">ready</div>
+<div id="status">loading…</div>
+
+<div id="uwu">~ UwU ~</div>
 
 <audio id="bgm" src="assets/music.mp3" loop preload="auto"></audio>
 
-<div id="unlock">
-  <div id="unlockCard" role="button" aria-label="Start audio">
-    <div id="unlockTitle">Пусни звука 🔊</div>
-    <div id="unlockSub">Autoplay е блокиран. Един tap и тръгва.</div>
-    <div id="unlockHint">TAP ANYWHERE</div>
-  </div>
-</div>
-
 <script>
-const statusEl = document.getElementById("status");
 const audio = document.getElementById("bgm");
-const unlock = document.getElementById("unlock");
-const unlockCard = document.getElementById("unlockCard");
-
-const middle = document.getElementById("middle");
-const crawlWrap = document.getElementById("crawlWrap");
+const uwu = document.getElementById("uwu");
+const statusEl = document.getElementById("status");
 const crawlText = document.getElementById("crawlText");
+const crawlWrap = document.getElementById("crawlWrap");
+const middle = document.getElementById("middle");
 const logo = document.getElementById("debaLogo");
 
 audio.volume = 1.0;
 
-let crawlRAF = null;
-let crawlStartTime = null;
 let durationMs = 203000;
+let startTime = null;
+let raf = null;
 
-function setMiddleTopToLogoBottom(){
+/* POSITION CRAWL UNDER LOGO */
+function setMiddleTop(){
   const r = logo.getBoundingClientRect();
-  const gap = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--logo-gap")) || 18;
-  middle.style.top = `${r.bottom + gap}px`;
+  middle.style.top = `${r.bottom + 20}px`;
 }
 
+/* LOAD TEXT FROM FILE */
+fetch("assets/text.txt")
+  .then(r => r.text())
+  .then(t => crawlText.textContent = t)
+  .catch(() => crawlText.textContent = "failed to load text");
+
+/* START CRAWL */
 function startCrawl(){
-  cancelAnimationFrame(crawlRAF);
+  cancelAnimationFrame(raf);
+  setMiddleTop();
 
-  setMiddleTopToLogoBottom();
-
-  const windowH = middle.getBoundingClientRect().height;
+  const winH = middle.getBoundingClientRect().height;
   const textH = crawlText.getBoundingClientRect().height;
 
-  // Start below the visible crawl window, end when fully passed
-  const startY = windowH + 30;
-  const endY   = -textH - 40;
+  const startY = winH + 20;
+  const endY = -textH - 40;
 
-  crawlWrap.style.transform = `translateY(${startY}px)`;
-  crawlStartTime = performance.now();
+  startTime = performance.now();
 
   function step(now){
-    const t = (now - crawlStartTime) % durationMs;
-    const p = t / durationMs;
+    const p = ((now - startTime) % durationMs) / durationMs;
     const y = startY + (endY - startY) * p;
-
     crawlWrap.style.transform = `translateY(${y}px)`;
-    crawlRAF = requestAnimationFrame(step);
+    raf = requestAnimationFrame(step);
   }
-
-  crawlRAF = requestAnimationFrame(step);
+  raf = requestAnimationFrame(step);
 }
 
+/* TRY PLAY AUDIO */
 async function tryPlay(){
   try{
     await audio.play();
-    unlock.style.display = "none";
+    uwu.style.display = "none";
     statusEl.textContent = "music on";
     startCrawl();
-  }catch(e){
-    unlock.style.display = "flex";
-    statusEl.textContent = "tap to enable sound";
+  }catch{
+    uwu.style.display = "flex";
+    statusEl.textContent = "tap UwU";
   }
 }
 
-audio.addEventListener("loadedmetadata", () => {
-  if (isFinite(audio.duration) && audio.duration > 1) {
-    durationMs = audio.duration * 1000;
-  }
-  if (!audio.paused) startCrawl();
+audio.addEventListener("loadedmetadata", ()=>{
+  if (audio.duration > 1) durationMs = audio.duration * 1000;
 });
 
-tryPlay();
+/* UWU = USER GESTURE */
+uwu.addEventListener("pointerdown", tryPlay);
+window.addEventListener("keydown", tryPlay);
+window.addEventListener("pointerdown", tryPlay, { once:true });
 
-function userGestureStart(){
-  tryPlay();
-}
-
-unlock.addEventListener("pointerdown", userGestureStart);
-unlockCard.addEventListener("pointerdown", userGestureStart);
-window.addEventListener("pointerdown", userGestureStart, { passive:true });
-window.addEventListener("keydown", userGestureStart);
-
-setInterval(() => {
-  if (!document.hidden && audio.paused) tryPlay();
-}, 1500);
-
-document.addEventListener("visibilitychange", () => {
+/* RETRY WHEN TAB RETURNS */
+document.addEventListener("visibilitychange", ()=>{
   if (!document.hidden) tryPlay();
 });
 
-window.addEventListener("resize", () => {
-  if (!audio.paused) startCrawl();
-  else setMiddleTopToLogoBottom();
-});
-
-// ensure correct top even before audio starts
-window.addEventListener("load", setMiddleTopToLogoBottom);
+/* INIT */
+window.addEventListener("resize", ()=>{ if (!audio.paused) startCrawl(); });
+window.addEventListener("load", ()=>{ setMiddleTop(); tryPlay(); });
 </script>
 
 </body>
