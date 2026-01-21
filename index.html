@@ -84,7 +84,7 @@
     const tmpSize = new THREE.Vector3();
     const tmpCenter = new THREE.Vector3();
 
-    function fitCameraToObject(object, fitOffset = 1.35) {
+    function fitCameraToObject(object, fitOffset = 1.45) {
       tmpBox.setFromObject(object);
       tmpBox.getSize(tmpSize);
       tmpBox.getCenter(tmpCenter);
@@ -126,15 +126,16 @@
     draco.setDecoderPath("https://www.gstatic.com/draco/v1/decoders/");
     loader.setDRACOLoader(draco);
 
-    // === MEME TUNE HERE ===
-    const BPM = 130;          // faster/slower loop
-    const squashAmt = 0.28;   // 0.15 subtle, 0.28 meme, 0.40 insane
-    const bounceY = 0.03;     // set 0 to disable vertical move
-    const tilt = 0.05;        // set 0 to disable tilt wobble
+    // === TUNE HERE ===
+    const BPM = 145;            // loop speed
+    const squashAmt = 0.55;     // MORE aggressive stretch/squash
+    const bounceY = 0.00;       // no vertical wiggle
+    const rotateSpeed = 0.55;   // constant center rotation (radians/sec)
 
     const basePos = new THREE.Vector3();
     const baseScale = new THREE.Vector3(1,1,1);
     const baseQuat = new THREE.Quaternion();
+    const e = new THREE.Euler(0,0,0,"YXZ");
 
     statusEl.textContent = "loading pig…";
 
@@ -157,10 +158,8 @@
       (err) => fail(err)
     );
 
-    // smoothstep-ish for nice looping
+    // smooth looping pulse
     function smoothPulse(x){
-      // x in [0..1]
-      // makes it linger at extremes a bit (meme feel)
       return 0.5 - 0.5 * Math.cos(x * Math.PI * 2);
     }
 
@@ -170,18 +169,16 @@
       if (pig) {
         const t = performance.now() * 0.001;
         const beat = 60 / BPM;
-        const phase = (t / beat) % 1;          // 0..1
-        const p = smoothPulse(phase);          // 0..1
+        const phase = (t / beat) % 1;   // 0..1
+        const p = smoothPulse(phase);   // 0..1
 
-        // p=0 -> squashed (wide), p=1 -> stretched (tall)
-        const stretch = p * squashAmt;         // 0..squashAmt
+        // p=0 squashed (wide), p=1 stretched (tall)
+        const stretch = p * squashAmt;
 
-        // Keep volume-ish consistent:
-        // tall: y up, x/z down a bit
-        // wide: y down, x/z up
-        const sx = 1 + (squashAmt - stretch) * 0.90;
-        const sy = 1 + stretch * 1.25;
-        const sz = 1 + (squashAmt - stretch) * 0.90;
+        // Wider when squashed, taller when stretched
+        const sx = 1 + (squashAmt - stretch) * 1.25; // OUT more
+        const sy = 1 + stretch * 1.90;               // UP more
+        const sz = 1 + (squashAmt - stretch) * 1.25; // OUT more
 
         pig.scale.set(
           baseScale.x * sx,
@@ -189,24 +186,15 @@
           baseScale.z * sz
         );
 
-        // tiny up/down so it feels like it's "hitting" the floor
-        pig.position.set(
-          basePos.x,
-          basePos.y + Math.sin(phase * Math.PI * 2) * bounceY,
-          basePos.z
-        );
+        // keep centered (no wiggle)
+        pig.position.set(basePos.x, basePos.y + bounceY, basePos.z);
 
-        // optional tiny wobble
-        if (tilt !== 0) {
-          const wob = Math.sin(phase * Math.PI * 2) * tilt;
-          pig.quaternion.copy(baseQuat);
-          pig.rotateZ(wob);
-        } else {
-          pig.quaternion.copy(baseQuat);
-        }
+        // simple center rotation only
+        e.set(0, t * rotateSpeed, 0);
+        pig.quaternion.copy(baseQuat).multiply(new THREE.Quaternion().setFromEuler(e));
 
-        // refit occasionally (prevents edge clipping if you crank values)
-        if ((t % 1) < 0.02) fitCameraToObject(pig);
+        // avoid clipping when values are aggressive
+        if ((t % 0.5) < 0.02) fitCameraToObject(pig, 1.55);
       }
 
       renderer.render(scene, camera);
