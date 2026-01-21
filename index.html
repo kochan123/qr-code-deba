@@ -26,26 +26,38 @@
   <div id="hint">tap = turbo 🐷</div>
   <div id="status"></div>
 
-  <script type="module">
-    import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.module.js";
-    import { GLTFLoader } from "https://cdn.jsdelivr.net/npm/three@0.158.0/examples/jsm/loaders/GLTFLoader.js";
-    import { DRACOLoader } from "https://cdn.jsdelivr.net/npm/three@0.158.0/examples/jsm/loaders/DRACOLoader.js";
+<script type="module">
+  const statusEl = document.getElementById("status");
+  const canvas = document.getElementById("pig");
 
-    const statusEl = document.getElementById("status");
-    const canvas = document.getElementById("pig");
+  function fail(e) {
+    console.error(e);
+    statusEl.textContent = "ERROR: " + (e?.message || e);
+    statusEl.style.color = "crimson";
+  }
+
+  async function main() {
+    statusEl.textContent = "loading three.js...";
+
+    // Dynamic imports so we can catch failures
+    const THREE = await import("https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.module.js");
+    const { GLTFLoader } = await import("https://cdn.jsdelivr.net/npm/three@0.158.0/examples/jsm/loaders/GLTFLoader.js");
+    const { DRACOLoader } = await import("https://cdn.jsdelivr.net/npm/three@0.158.0/examples/jsm/loaders/DRACOLoader.js");
+
+    statusEl.textContent = "three.js loaded, loading pig...";
 
     const scene = new THREE.Scene();
-    const renderer = new THREE.WebGLRenderer({ canvas, alpha:true, antialias:true });
+    const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
     renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
 
     const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 100000);
 
     scene.add(new THREE.AmbientLight(0xffffff, 0.7));
     const key = new THREE.DirectionalLight(0xffffff, 1.0);
-    key.position.set(2,2,2);
+    key.position.set(2, 2, 2);
     scene.add(key);
 
-    function resize(){
+    function resize() {
       const r = canvas.getBoundingClientRect();
       const w = Math.max(1, Math.floor(r.width));
       const h = Math.max(1, Math.floor(r.height));
@@ -55,7 +67,6 @@
     }
     addEventListener("resize", resize);
 
-    // loaders
     const loader = new GLTFLoader();
     const draco = new DRACOLoader();
     draco.setDecoderPath("https://www.gstatic.com/draco/v1/decoders/");
@@ -63,7 +74,6 @@
 
     let pig = null;
 
-    statusEl.textContent = "loading pig...";
     loader.load(
       "assets/pig.glb",
       (gltf) => {
@@ -86,21 +96,18 @@
         camera.updateProjectionMatrix();
 
         scene.add(pig);
-        statusEl.textContent = "";
+        statusEl.textContent = ""; // success
         resize();
       },
       undefined,
-      (err) => {
-        console.error(err);
-        statusEl.textContent = "pig failed to load (check assets/pig.glb)";
-      }
+      (err) => fail(err)
     );
 
     // spin + turbo
     let base = 0.03, turbo = 0;
     addEventListener("pointerdown", () => turbo = Math.min(turbo + 0.1, 0.35));
 
-    function animate(){
+    function animate() {
       requestAnimationFrame(animate);
       turbo *= 0.92;
       if (pig) pig.rotation.y += (base + turbo);
@@ -109,6 +116,10 @@
 
     resize();
     animate();
-  </script>
+  }
+
+  main().catch(fail);
+</script>
+
 </body>
 </html>
