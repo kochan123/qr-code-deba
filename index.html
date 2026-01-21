@@ -24,7 +24,6 @@
       -webkit-user-drag:none;
     }
 
-    /* Responsive canvas: fills available space under the logo */
     canvas{
       width: min(90vw, 700px);
       height: min(60vh, 520px);
@@ -85,17 +84,32 @@
 
     let pig = null;
 
+    // --- dance state ---
+    const baseRot = new THREE.Euler(0, 0, 0);
+    const basePos = new THREE.Vector3(0, 0, 0);
+    const baseScale = new THREE.Vector3(1, 1, 1);
+
+    let rotTarget = new THREE.Vector3(0, 0, 0);
+    let posTarget = new THREE.Vector3(0, 0, 0);
+    let scaleTarget = new THREE.Vector3(1, 1, 1);
+    let nextChange = 0;
+
+    const tmpBox = new THREE.Box3();
+    const tmpSize = new THREE.Vector3();
+    const tmpCenter = new THREE.Vector3();
+
+    function rand(a, b){ return a + Math.random() * (b - a); }
+
     function fitCameraToObject(object, fitOffset = 1.25) {
-      const box = new THREE.Box3().setFromObject(object);
-      const size = box.getSize(new THREE.Vector3());
-      const center = box.getCenter(new THREE.Vector3());
+      tmpBox.setFromObject(object);
+      tmpBox.getSize(tmpSize);
+      tmpBox.getCenter(tmpCenter);
 
       // center model at origin
-      object.position.sub(center);
+      object.position.sub(tmpCenter);
 
-      const maxDim = Math.max(size.x, size.y, size.z);
+      const maxDim = Math.max(tmpSize.x, tmpSize.y, tmpSize.z);
 
-      // pick limiting axis based on aspect ratio
       const fov = THREE.MathUtils.degToRad(camera.fov);
       const aspect = camera.aspect;
 
@@ -138,9 +152,13 @@
         pig = gltf.scene;
         scene.add(pig);
 
-        // Fit immediately, and again after resize
+        // Fit + remember the "rest pose" (so we always return smoothly)
         resize();
         fitCameraToObject(pig);
+
+        baseRot.set(pig.rotation.x, pig.rotation.y, pig.rotation.z);
+        basePos.copy(pig.position);
+        baseScale.copy(pig.scale);
 
         statusEl.textContent = "";
       },
@@ -154,10 +172,53 @@
       if (pig) {
         const t = performance.now() * 0.001;
 
-        // "oiia oiia" vibe: steady spin + rhythmic wobble
-        pig.rotation.y = t * 2.2;                  // constant spin
-        pig.rotation.z = Math.sin(t * 6.0) * 0.25; // wobble tilt
-        pig.position.y = Math.sin(t * 6.0) * 0.05; // tiny bounce
+        // Change dance intent every 0.35–0.9s
+        if (t > nextChange) {
+          nextChange = t + rand(0.35, 0.9);
+
+          // rotation targets (radians)
+          rotTarget.set(
+            rand(-0.25, 0.25),  // x
+            rand(-0.18, 0.18),  // y (extra over spin)
+            rand(-0.35, 0.35)   // z
+          );
+
+          // small position groove
+          posTarget.set(
+            rand(-0.06, 0.06),  // x
+            rand(-0.03, 0.08),  // y
+            rand(-0.04, 0.04)   // z
+          );
+
+          // subtle squash/stretch
+          scaleTarget.set(
+            rand(0.92, 1.08),
+            rand(0.90, 1.10),
+            rand(0.92, 1.08)
+          );
+        }
+
+        // smooth follow (no jitter)
+        const follow = 0.06;
+
+        // constant spin + random yaw
+        const spin = t * 2.1;
+
+        pig.rotation.x += (baseRot.x + rotTarget.x - pig.rotation.x) * follow;
+        pig.rotation.z += (baseRot.z + rotTarget.z - pig.rotation.z) * follow;
+        pig.rotation.y += ((spin + baseRot.y + rotTarget.y) - pig.rotation.y) * follow;
+
+        pig.position.x += (basePos.x + posTarget.x - pig.position.x) * follow;
+        pig.position.y += (basePos.y + posTarget.y - pig.position.y) * follow;
+        pig.position.z += (basePos.z + posTarget.z - pig.position.z) * follow;
+
+        pig.scale.x += (baseScale.x * scaleTarget.x - pig.scale.x) * follow;
+        pig.scale.y += (baseScale.y * scaleTarget.y - pig.scale.y) * follow;
+        pig.scale.z += (baseScale.z * scaleTarget.z - pig.scale.z) * follow;
+
+        // extra "dance bounce" layers
+        pig.rotation.z += Math.sin(t * 7.5) * 0.02 + Math.sin(t * 3.3) * 0.015;
+        pig.position.y += Math.abs(Math.sin(t * 6.0)) * 0.01;
       }
 
       renderer.render(scene, camera);
