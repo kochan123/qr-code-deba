@@ -15,7 +15,6 @@
       background:var(--bg); overflow:hidden;
       font-family:system-ui,sans-serif;
     }
-
     #debaLogo{
       width:min(720px,88vw);
       height:auto;
@@ -23,7 +22,6 @@
       user-select:none;
       -webkit-user-drag:none;
     }
-
     canvas{
       width: min(90vw, 700px);
       height: min(60vh, 520px);
@@ -31,7 +29,6 @@
       max-height: 60vh;
       touch-action: manipulation;
     }
-
     #status{
       position:fixed; bottom:10px; left:10px;
       font-size:12px; opacity:.75;
@@ -71,7 +68,6 @@
     }
 
     const scene = new THREE.Scene();
-
     const renderer = new THREE.WebGLRenderer({ canvas, alpha:true, antialias:true });
     renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
 
@@ -88,30 +84,13 @@
     const tmpSize = new THREE.Vector3();
     const tmpCenter = new THREE.Vector3();
 
-    const axis = new THREE.Vector3();
-    const qStep = new THREE.Quaternion();
-    const qWob = new THREE.Quaternion();
-
-    function rand(a, b){ return a + Math.random() * (b - a); }
-
-    // Store centered origin so we can keep pig pinned
-    const pinnedCenter = new THREE.Vector3(0, 0, 0);
-
-    // --- dance state (scale + rotation only; keep centered to avoid clipping) ---
-    const baseScale = new THREE.Vector3(1, 1, 1);
-    let scaleTarget = new THREE.Vector3(1, 1, 1);
-
-    let angVel = new THREE.Vector3(0.8, 1.6, 1.0);
-    let angVelTarget = new THREE.Vector3(0.8, 1.6, 1.0);
-
-    let nextChange = 0;
-    let lastT = performance.now() * 0.001;
-
-    // Camera fit that uses BOTH vertical+horizontal limits (prevents cut-off)
-    function fitCameraToObject(object, fitOffset = 1.45) {
+    function fitCameraToObject(object, fitOffset = 1.35) {
       tmpBox.setFromObject(object);
       tmpBox.getSize(tmpSize);
       tmpBox.getCenter(tmpCenter);
+
+      // center model at origin
+      object.position.sub(tmpCenter);
 
       const maxDim = Math.max(tmpSize.x, tmpSize.y, tmpSize.z);
 
@@ -143,11 +122,25 @@
     }
     addEventListener("resize", resize);
 
-    // Loaders
     const loader = new GLTFLoader();
     const draco = new DRACOLoader();
     draco.setDecoderPath("https://www.gstatic.com/draco/v1/decoders/");
     loader.setDRACOLoader(draco);
+
+    // --- bounce params (edit these) ---
+    const BPM = 128;                // set this to match the song feel
+    const beat = (60 / BPM);        // seconds per beat
+    const bounceAmp = 0.10;         // vertical bounce amount
+    const tiltAmp = 0.22;           // side tilt
+    const nodAmp = 0.10;            // forward/back nod
+    const yawAmp = 0.18;            // small left/right twist
+    const squash = 0.10;            // squash/stretch strength
+
+    // baseline pose saved after load
+    const basePos = new THREE.Vector3();
+    const baseScale = new THREE.Vector3(1,1,1);
+    const baseQuat = new THREE.Quaternion();
+    const e = new THREE.Euler(0,0,0,"YXZ");
 
     statusEl.textContent = "loading pig…";
 
@@ -157,19 +150,12 @@
         pig = gltf.scene;
         scene.add(pig);
 
-        // Center it ONCE and pin its position so it never drifts out of frame
-        tmpBox.setFromObject(pig);
-        tmpBox.getCenter(tmpCenter);
-        pig.position.sub(tmpCenter);      // now centered at origin
-        pinnedCenter.copy(pig.position);  // remember that exact centered position
-
-        baseScale.copy(pig.scale);
-
-        // random initial orientation
-        pig.quaternion.setFromEuler(new THREE.Euler(rand(-1,1), rand(-1,1), rand(-1,1)));
-
         resize();
         fitCameraToObject(pig);
+
+        basePos.copy(pig.position);
+        baseScale.copy(pig.scale);
+        baseQuat.copy(pig.quaternion);
 
         statusEl.textContent = "";
       },
@@ -177,64 +163,46 @@
       (err) => fail(err)
     );
 
+    function easeOutQuad(x){ return 1 - (1 - x) * (1 - x); }
+
     function animate(){
       requestAnimationFrame(animate);
 
-      const t = performance.now() * 0.001;
-      const dt = Math.min(0.05, Math.max(0.0, t - lastT));
-      lastT = t;
-
       if (pig) {
-        // keep it pinned (prevents drifting clipping)
-        pig.position.copy(pinnedCenter);
+        const t = performance.now() * 0.001;
 
-        // change style often, but not crazy big
-        if (t > nextChange) {
-          nextChange = t + rand(0.25, 0.75);
+        // phase within beat [0..1)
+        const p = (t / beat) % 1;
 
-          // scale (limit it more to avoid cut-off)
-          scaleTarget.set(
-            rand(0.92, 1.10),
-            rand(0.90, 1.12),
-            rand(0.92, 1.10)
-          );
+        // "kick" bounce: quick up, slower down
+        const up = p < 0.25 ? (p / 0.25) : (1 - (p - 0.25) / 0.75);
+        const b = easeOutQuad(Math.max(0, up)); // 0..1
 
-          // angular velocity target (flips + random directions)
-          angVelTarget.set(
-            rand(-2.6, 2.6),
-            rand(-3.2, 3.2),
-            rand(-2.6, 2.6)
-          );
+        // secondary smaller bounce to feel more alive
+        const b2 = (Math.sin(t * (Math.PI * 2) / (beat * 2)) + 1) * 0.5;
 
-          // avoid dead slow
-          if (Math.abs(angVelTarget.x) < 0.7) angVelTarget.x = Math.sign(angVelTarget.x || 1) * rand(0.7, 2.0);
-          if (Math.abs(angVelTarget.y) < 0.9) angVelTarget.y = Math.sign(angVelTarget.y || 1) * rand(0.9, 2.6);
-          if (Math.abs(angVelTarget.z) < 0.7) angVelTarget.z = Math.sign(angVelTarget.z || 1) * rand(0.7, 2.0);
-        }
+        // position (only Y)
+        pig.position.set(basePos.x, basePos.y + b * bounceAmp + b2 * (bounceAmp * 0.25), basePos.z);
 
-        // smooth changes
-        const followScale = 0.10;
-        const followVel   = 0.07;
+        // tilt + nod + tiny yaw (all bounded, no chaos)
+        e.y = Math.sin(t * (Math.PI * 2) / (beat * 4)) * yawAmp;         // slow sway
+        e.z = Math.sin(t * (Math.PI * 2) / beat) * tiltAmp * 0.6;        // side tilt on beat
+        e.x = Math.cos(t * (Math.PI * 2) / beat) * nodAmp * 0.6;         // nod on beat
 
-        pig.scale.lerp(new THREE.Vector3().copy(baseScale).multiply(scaleTarget), followScale);
-        angVel.lerp(angVelTarget, followVel);
+        const q = new THREE.Quaternion().setFromEuler(e);
+        pig.quaternion.copy(baseQuat).multiply(q);
 
-        // rotation step
-        axis.set(angVel.x, angVel.y, angVel.z);
-        const speed = axis.length();
-        if (speed > 1e-6) {
-          axis.normalize();
-          qStep.setFromAxisAngle(axis, speed * dt);
-          pig.quaternion.multiply(qStep);
-        }
+        // squash/stretch synced to bounce
+        const s = 1 + (b * squash);
+        pig.scale.set(
+          baseScale.x * (1 + b * (squash * 0.35)),
+          baseScale.y * (1 - b * (squash * 0.60)),
+          baseScale.z * (1 + b * (squash * 0.35))
+        );
 
-        // "dance wobble"
-        const wob = Math.sin(t * 8.0) * 0.03 + Math.sin(t * 3.2) * 0.02;
-        qWob.setFromEuler(new THREE.Euler(wob, 0, wob * 0.7));
-        pig.quaternion.multiply(qWob);
-
-        // keep camera fit as scale/rotation changes (prevents cut-off)
-        fitCameraToObject(pig);
+        // keep framed if scale changes a lot
+        // (cheap: only occasionally)
+        if ((t % 1) < 0.02) fitCameraToObject(pig);
       }
 
       renderer.render(scene, camera);
