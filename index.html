@@ -41,7 +41,7 @@
 <body>
   <img id="debaLogo" src="assets/deba.png" alt="Деба">
   <canvas id="pig"></canvas>
-  <div id="hint">tap = turbo 🐷</div>
+  <!-- <div id="hint">tap = turbo 🐷</div> -->
   <div id="status">booting…</div>
 
   <script type="module">
@@ -120,16 +120,24 @@
       (err) => fail(err)
     );
 
-    // spin + turbo
-    let base = 0.03, turbo = 0;
-    addEventListener("pointerdown", () => turbo = Math.min(turbo + 0.12, 0.40));
+    // // spin + turbo
+    // let base = 0.03, turbo = 0;
+    // addEventListener("pointerdown", () => turbo = Math.min(turbo + 0.12, 0.40));
 
-    function animate(){
-      requestAnimationFrame(animate);
-      turbo *= 0.92;
-      if (pig) pig.rotation.y += (base + turbo);
-      renderer.render(scene, camera);
-    }
+function animate(){
+  requestAnimationFrame(animate);
+
+  if (pig) {
+    const t = performance.now() * 0.001;
+
+    // "oiia oiia" vibe: steady spin + rhythmic wobble
+    pig.rotation.y = t * 2.2;                 // constant spin
+    pig.rotation.z = Math.sin(t * 6.0) * 0.25; // wobble tilt
+    pig.position.y = Math.sin(t * 6.0) * 0.05; // tiny bounce
+  }
+
+  renderer.render(scene, camera);
+}
 
     resize();
     animate();
