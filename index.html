@@ -2,6 +2,7 @@
 <html lang="bg">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Деба</title>
 
   <!-- Block Google -->
@@ -10,21 +11,32 @@
   <style>
     body {
       margin: 0;
-      background: #b6f5c2;
+      background: #b6f5c2; /* light green */
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
       height: 100vh;
-      font-family: sans-serif;
+      font-family: system-ui, sans-serif;
+      overflow: hidden;
     }
     h1 {
-      font-size: 64px;
-      margin-bottom: 20px;
+      font-size: clamp(48px, 8vw, 96px);
+      margin: 0 0 18px 0;
+      letter-spacing: 2px;
+      color: rgba(0,0,0,0.55);
+      user-select: none;
     }
     canvas {
-      width: 300px;
-      height: 300px;
+      width: min(360px, 80vw);
+      height: min(360px, 80vw);
+      touch-action: manipulation;
+    }
+    .hint {
+      margin-top: 10px;
+      font-size: 14px;
+      color: rgba(0,0,0,0.45);
+      user-select: none;
     }
   </style>
 </head>
@@ -32,35 +44,78 @@
 
 <h1>Деба</h1>
 <canvas id="pig"></canvas>
+<div class="hint">tap = turbo 🐷</div>
 
 <script src="https://unpkg.com/three@0.158.0/build/three.min.js"></script>
 <script src="https://unpkg.com/three@0.158.0/examples/js/loaders/GLTFLoader.js"></script>
 
 <script>
+  const canvas = document.getElementById("pig");
+
   const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(75, 1, 0.1, 1000);
-  const renderer = new THREE.WebGLRenderer({ canvas: document.getElementById("pig"), alpha: true });
-  renderer.setSize(300, 300);
 
-  const light = new THREE.DirectionalLight(0xffffff, 1);
-  light.position.set(1, 1, 1);
-  scene.add(light);
+  const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 
+  const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 1000);
+  camera.position.set(0, 0.2, 3);
+
+  // Lights (so it doesn’t look flat)
+  scene.add(new THREE.AmbientLight(0xffffff, 0.65));
+  const key = new THREE.DirectionalLight(0xffffff, 1.0);
+  key.position.set(2, 2, 2);
+  scene.add(key);
+
+  // Fit canvas to CSS size
+  function resize() {
+    const rect = canvas.getBoundingClientRect();
+    const w = Math.max(1, Math.floor(rect.width));
+    const h = Math.max(1, Math.floor(rect.height));
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+  }
+  window.addEventListener("resize", resize);
+
+  // Load pig model (CDN-safe; raw.githubusercontent often fails on Pages)
   const loader = new THREE.GLTFLoader();
+  let pig = null;
+
   loader.load(
-    "https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Pig/glTF/Pig.gltf",
+    "https://cdn.jsdelivr.net/gh/KhronosGroup/glTF-Sample-Models@master/2.0/Pig/glTF/Pig.gltf",
     (gltf) => {
-      scene.add(gltf.scene);
+      pig = gltf.scene;
+      pig.scale.set(1.4, 1.4, 1.4);
+      pig.position.y = -0.25;
+      scene.add(pig);
+      resize();
+    },
+    undefined,
+    (err) => {
+      console.error("Pig failed to load:", err);
     }
   );
 
-  camera.position.z = 3;
+  // Spin control: base spin + turbo on tap/click
+  let spin = 0.012;       // normal speed
+  let turbo = 0.0;        // extra speed that decays
+
+  function boost() {
+    turbo = Math.min(turbo + 0.08, 0.25);
+  }
+  window.addEventListener("pointerdown", boost);
 
   function animate() {
     requestAnimationFrame(animate);
-    scene.rotation.y += 0.01;
+
+    const speed = spin + turbo;
+    turbo *= 0.92; // decay
+
+    if (pig) pig.rotation.y += speed;
     renderer.render(scene, camera);
   }
+
+  resize();
   animate();
 </script>
 
