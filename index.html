@@ -57,21 +57,22 @@ body{
   text-shadow:
     0 1px 0 rgba(0,0,0,0.05),
     0 0 10px rgba(180,70,150,0.18);
-  opacity:0;              /* hidden until music plays */
-  transition: opacity .8s ease;
+
+  opacity:0;                 /* hidden until music plays */
+  transition: opacity 0ms;   /* IMMEDIATE once started */
 }
 
-/* JACK IMAGES (spawn from bottom, then stay) */
+/* JACK IMAGES (slower spawn) */
 .spawn{
   position:fixed;
   bottom:18px;
   width:min(120px,22vw);
   height:auto;
   opacity:0;
-  transform: translateY(140px);
+  transform: translateY(180px);
   transition:
-    transform 900ms cubic-bezier(.2,.9,.2,1),
-    opacity 700ms ease;
+    transform 1800ms cubic-bezier(.2,.9,.2,1) 250ms, /* slow + delay */
+    opacity 1200ms ease 250ms;                      /* slow + delay */
   z-index:4;
   pointer-events:none;
   user-select:none;
@@ -90,7 +91,7 @@ body.started .spawn{
 #uwu{
   position:fixed;
   inset:0;
-  display:none;           /* only shown if autoplay fails */
+  display:none;
   align-items:center;
   justify-content:center;
   font-size:34px;
@@ -124,7 +125,7 @@ body.started .spawn{
   <img id="debaLogo" src="assets/deba.png" alt="Деба">
 </div>
 
-<!-- spawn images (hidden until started) -->
+<!-- spawn images -->
 <img id="jackLeft" class="spawn" src="assets/isisjack.png" alt="">
 <img id="jackRight" class="spawn" src="assets/isisjack_flipped.png" alt="">
 
@@ -150,7 +151,7 @@ let started = false;
 let durationMs = 203000; // fallback
 let raf = null;
 
-/* load text (still invisible until start) */
+/* load text */
 fetch("assets/text.txt")
   .then(r => r.text())
   .then(t => {
@@ -177,7 +178,7 @@ function startScroll(){
   const startY = screenH + 40;
   const endY   = -textH - 40;
 
-  // show crawl only now (music is playing)
+  // show crawl immediately
   crawl.style.opacity = "1";
 
   function step(){
@@ -201,15 +202,17 @@ async function tryStart(){
   statusEl.textContent = "starting…";
 
   try{
-    await music.play();              // blocked until gesture on most browsers
+    await music.play();
     started = true;
 
-    // mark started -> images spawn & stay
+    // start text IMMEDIATELY
+    startScroll();
+
+    // spawn images (slower via CSS transition)
     document.body.classList.add("started");
 
     hideUwu();
     statusEl.textContent = "music on";
-    startScroll();
   }catch{
     showUwu();
     crawl.style.opacity = "0";
