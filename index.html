@@ -84,19 +84,27 @@
 
     let pig = null;
 
-    // --- dance state ---
-    const baseRot = new THREE.Euler(0, 0, 0);
+    // --- dance state (position + scale + rotation via quaternion) ---
     const basePos = new THREE.Vector3(0, 0, 0);
     const baseScale = new THREE.Vector3(1, 1, 1);
 
-    let rotTarget = new THREE.Vector3(0, 0, 0);
     let posTarget = new THREE.Vector3(0, 0, 0);
     let scaleTarget = new THREE.Vector3(1, 1, 1);
+
+    // Angular velocity (radians/sec). Randomized in both direction and magnitude.
+    let angVel = new THREE.Vector3(0.8, 1.6, 1.0);
+    let angVelTarget = new THREE.Vector3(0.8, 1.6, 1.0);
+
     let nextChange = 0;
+    let lastT = performance.now() * 0.001;
 
     const tmpBox = new THREE.Box3();
     const tmpSize = new THREE.Vector3();
     const tmpCenter = new THREE.Vector3();
+
+    const axis = new THREE.Vector3();
+    const qStep = new THREE.Quaternion();
+    const qWob = new THREE.Quaternion();
 
     function rand(a, b){ return a + Math.random() * (b - a); }
 
@@ -152,13 +160,15 @@
         pig = gltf.scene;
         scene.add(pig);
 
-        // Fit + remember the "rest pose" (so we always return smoothly)
+        // Fit camera + capture baseline pose after centering
         resize();
         fitCameraToObject(pig);
 
-        baseRot.set(pig.rotation.x, pig.rotation.y, pig.rotation.z);
         basePos.copy(pig.position);
         baseScale.copy(pig.scale);
+
+        // random initial orientation
+        pig.quaternion.setFromEuler(new THREE.Euler(rand(-1,1), rand(-1,1), rand(-1,1)));
 
         statusEl.textContent = "";
       },
@@ -169,55 +179,68 @@
     function animate(){
       requestAnimationFrame(animate);
 
+      const t = performance.now() * 0.001;
+      const dt = Math.min(0.05, Math.max(0.0, t - lastT)); // clamp dt
+      lastT = t;
+
       if (pig) {
-        const t = performance.now() * 0.001;
-
-        // Change dance intent every 0.35–0.9s
+        // Change dance intent every 0.25–0.8s
         if (t > nextChange) {
-          nextChange = t + rand(0.35, 0.9);
+          nextChange = t + rand(0.25, 0.8);
 
-          // rotation targets (radians)
-          rotTarget.set(
-            rand(-0.25, 0.25),  // x
-            rand(-0.18, 0.18),  // y (extra over spin)
-            rand(-0.35, 0.35)   // z
-          );
-
-          // small position groove
+          // position groove
           posTarget.set(
-            rand(-0.06, 0.06),  // x
-            rand(-0.03, 0.08),  // y
-            rand(-0.04, 0.04)   // z
+            rand(-0.07, 0.07),
+            rand(-0.03, 0.10),
+            rand(-0.05, 0.05)
           );
 
-          // subtle squash/stretch
+          // squash/stretch (more noticeable)
           scaleTarget.set(
-            rand(0.92, 1.08),
-            rand(0.90, 1.10),
-            rand(0.92, 1.08)
+            rand(0.85, 1.18),
+            rand(0.82, 1.22),
+            rand(0.85, 1.18)
           );
+
+          // angular velocity target: random direction + speed (enables flips)
+          angVelTarget.set(
+            rand(-3.0, 3.0),  // x flips
+            rand(-3.6, 3.6),  // y spin (both directions)
+            rand(-3.0, 3.0)   // z flips
+          );
+
+          // avoid "dead" slow moments
+          if (Math.abs(angVelTarget.x) < 0.7) angVelTarget.x = Math.sign(angVelTarget.x || 1) * rand(0.7, 2.2);
+          if (Math.abs(angVelTarget.y) < 0.9) angVelTarget.y = Math.sign(angVelTarget.y || 1) * rand(0.9, 3.0);
+          if (Math.abs(angVelTarget.z) < 0.7) angVelTarget.z = Math.sign(angVelTarget.z || 1) * rand(0.7, 2.2);
         }
 
-        // smooth follow (no jitter)
-        const follow = 0.09;
+        // smooth follow
+        const followPosScale = 0.10;
+        const followVel = 0.06;
 
-        // constant spin + random yaw
-        const spin = t * 2.1;
+        // position & scale toward targets
+        pig.position.lerp(new THREE.Vector3().copy(basePos).add(posTarget), followPosScale);
+        pig.scale.lerp(new THREE.Vector3().copy(baseScale).multiply(scaleTarget), followPosScale);
 
-        pig.rotation.x += (baseRot.x + rotTarget.x - pig.rotation.x) * follow;
-        pig.rotation.z += (baseRot.z + rotTarget.z - pig.rotation.z) * follow;
-        pig.rotation.y += ((spin + baseRot.y + rotTarget.y) - pig.rotation.y) * follow;
+        // angular velocity toward target (smooth direction flips)
+        angVel.lerp(angVelTarget, followVel);
 
-        pig.position.x += (basePos.x + posTarget.x - pig.position.x) * follow;
-        pig.position.y += (basePos.y + posTarget.y - pig.position.y) * follow;
-        pig.position.z += (basePos.z + posTarget.z - pig.position.z) * follow;
+        // apply quaternion rotation step
+        axis.set(angVel.x, angVel.y, angVel.z);
+        const speed = axis.length();
 
-        pig.scale.x += (baseScale.x * scaleTarget.x - pig.scale.x) * follow;
-        pig.scale.y += (baseScale.y * scaleTarget.y - pig.scale.y) * follow;
-        pig.scale.z += (baseScale.z * scaleTarget.z - pig.scale.z) * follow;
+        if (speed > 1e-6) {
+          axis.normalize();
+          qStep.setFromAxisAngle(axis, speed * dt);
+          pig.quaternion.multiply(qStep);
+        }
 
-        // extra "dance bounce" layers
-        pig.rotation.z += Math.sin(t * 7.5) * 0.02 + Math.sin(t * 3.3) * 0.015;
+        // extra "beat wobble" overlay (dance feel)
+        const wob = Math.sin(t * 8.0) * 0.03 + Math.sin(t * 3.2) * 0.02;
+        qWob.setFromEuler(new THREE.Euler(wob, 0, wob * 0.7));
+        pig.quaternion.multiply(qWob);
+
         pig.position.y += Math.abs(Math.sin(t * 6.0)) * 0.01;
       }
 
