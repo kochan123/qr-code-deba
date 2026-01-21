@@ -17,37 +17,33 @@ body{
   font-family:system-ui,sans-serif;
 }
 
-/* --- TOP: LOGO --- */
+/* TOP: LOGO */
 #top{
   position:absolute;
   top:20px;
-  left:0;
-  right:0;
+  left:0; right:0;
   display:flex;
   justify-content:center;
   z-index:3;
 }
-
 #debaLogo{
   width:min(720px,88vw);
   user-select:none;
   -webkit-user-drag:none;
 }
 
-/* --- MIDDLE: CRAWL --- */
+/* MIDDLE: CRAWL */
 #middle{
   position:absolute;
   top:20%;
   bottom:30%;
-  left:0;
-  right:0;
+  left:0; right:0;
   display:flex;
   justify-content:center;
   pointer-events:none;
   perspective:700px;
   z-index:2;
 }
-
 .crawl{
   width:min(900px,92vw);
   color:rgba(40,40,40,0.55);
@@ -60,31 +56,28 @@ body{
   transform:rotateX(55deg) translateY(60vh);
   animation:crawlMove 203s linear infinite;
 }
-
 @keyframes crawlMove{
   from { transform:rotateX(55deg) translateY(60vh); }
   to   { transform:rotateX(55deg) translateY(-240vh); }
 }
 
-/* --- BOTTOM: PIG --- */
+/* BOTTOM: PIG */
 #bottom{
   position:absolute;
   bottom:0;
-  left:0;
-  right:0;
+  left:0; right:0;
   height:30vh;
   display:flex;
   justify-content:center;
   align-items:flex-end;
   z-index:3;
 }
-
 canvas{
-  width:min(420px,90vw);
+  width:min(520px,92vw);
   height:100%;
+  touch-action: manipulation;
 }
 
-/* status */
 #status{
   position:fixed;
   bottom:10px;
@@ -94,6 +87,8 @@ canvas{
   padding:6px 8px;
   border-radius:8px;
   background:rgba(255,255,255,0.35);
+  user-select:none;
+  z-index:4;
 }
 </style>
 
@@ -108,35 +103,23 @@ canvas{
 </head>
 
 <body>
-
-<!-- TOP -->
-<div id="top">
-  <img id="debaLogo" src="assets/deba.png" alt="Деба">
-</div>
-
-<!-- MIDDLE -->
-<div id="middle">
-  <div class="crawl">
-Словото, словото на мечовете
-Словото е словото на мечовете… за да бъдат възстановени несправедливостите
-Дори низките се надигнаха… пратеникът на решителните
-
-Словото, словото на мечовете
-Словото е словото на мечовете… за да бъдат възстановени несправедливостите
-Дори низките се надигнаха… пратеникът на решителните
-
-Ние сме онези, които градиха… крепостите си от черепи
-Прогонихме царя на Хосрой… с камшик като военна плячка
-Нашият пратеник е слънцето на истината…
+  <div id="top">
+    <img id="debaLogo" src="assets/deba.png" alt="Деба">
   </div>
-</div>
 
-<!-- BOTTOM -->
-<div id="bottom">
-  <canvas id="pig"></canvas>
-</div>
+  <div id="middle">
+    <div class="crawl">
+Словото, словото на мечовете
+Словото е словото на мечовете… за да бъдат възстановени несправедливостите
+Дори низките се надигнаха… пратеникът на решителните
+    </div>
+  </div>
 
-<div id="status">booting…</div>
+  <div id="bottom">
+    <canvas id="pig"></canvas>
+  </div>
+
+  <div id="status">booting…</div>
 
 <script type="module">
 import * as THREE from "three";
@@ -146,66 +129,141 @@ import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 const statusEl = document.getElementById("status");
 const canvas = document.getElementById("pig");
 
+function fail(e){
+  console.error(e);
+  statusEl.textContent = "ERROR: " + (e?.message || e);
+  statusEl.style.color = "crimson";
+}
+
 const scene = new THREE.Scene();
 const renderer = new THREE.WebGLRenderer({ canvas, alpha:true, antialias:true });
-renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
 
-const camera = new THREE.PerspectiveCamera(55,1,0.1,1000);
-camera.position.set(0,0,4);
+const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 10000);
 
-scene.add(new THREE.AmbientLight(0xffffff,0.8));
-const light = new THREE.DirectionalLight(0xffffff,1);
-light.position.set(2,2,2);
+scene.add(new THREE.AmbientLight(0xffffff,0.85));
+const light = new THREE.DirectionalLight(0xffffff,1.1);
+light.position.set(2,3,2);
 scene.add(light);
 
+let pig = null;
+let pivot = null;              // we rotate/scale this
+let baseScale = new THREE.Vector3(1,1,1);
+let modelSize = new THREE.Vector3(1,1,1);
+
+const box = new THREE.Box3();
+const size = new THREE.Vector3();
+const center = new THREE.Vector3();
+
+function fitCameraToObject(obj, fitOffset = 1.25){
+  box.setFromObject(obj);
+  box.getSize(size);
+  box.getCenter(center);
+
+  const maxDim = Math.max(size.x, size.y, size.z);
+  const fov = THREE.MathUtils.degToRad(camera.fov);
+  const aspect = camera.aspect;
+
+  const distV = (maxDim / 2) / Math.tan(fov / 2);
+  const fovH = 2 * Math.atan(Math.tan(fov / 2) * aspect);
+  const distH = (maxDim / 2) / Math.tan(fovH / 2);
+
+  const dist = Math.max(distV, distH) * fitOffset;
+
+  camera.position.set(0, maxDim * 0.10, dist);
+  camera.near = dist / 100;
+  camera.far  = dist * 100;
+  camera.lookAt(0, 0, 0);
+  camera.updateProjectionMatrix();
+}
+
+function resize(){
+  const r = canvas.getBoundingClientRect();
+  const w = Math.max(1, Math.floor(r.width));
+  const h = Math.max(1, Math.floor(r.height));
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+
+  if (pivot) fitCameraToObject(pivot, 1.35);
+}
+addEventListener("resize", resize);
+
+// loaders
 const loader = new GLTFLoader();
 const draco = new DRACOLoader();
 draco.setDecoderPath("https://www.gstatic.com/draco/v1/decoders/");
 loader.setDRACOLoader(draco);
 
-let pig, baseScale;
+statusEl.textContent = "loading pig…";
 
-loader.load("assets/pig.glb", gltf=>{
-  pig = gltf.scene;
-  scene.add(pig);
+loader.load(
+  "assets/pig.glb",
+  (gltf) => {
+    pig = gltf.scene;
 
-  pig.position.set(0,-0.3,0);
-  baseScale = pig.scale.clone();
+    // Put model inside a pivot Group so it always rotates about center
+    pivot = new THREE.Group();
+    pivot.add(pig);
+    scene.add(pivot);
 
-  statusEl.textContent="";
-});
+    // Center the MODEL at origin (inside pivot)
+    box.setFromObject(pig);
+    box.getSize(modelSize);
+    box.getCenter(center);
+    pig.position.sub(center);
 
+    // Anchor model visually to bottom of the canvas area:
+    // Move it DOWN by half its height, so feet are near bottom,
+    // then lift it a tiny bit to avoid clipping.
+    const halfH = modelSize.y / 2;
+    pig.position.y -= halfH;
+    pig.position.y += modelSize.y * 0.06;
+
+    // Save scale baseline
+    baseScale.copy(pivot.scale);
+
+    resize();
+    fitCameraToObject(pivot, 1.35);
+
+    statusEl.textContent = "";
+  },
+  undefined,
+  (err) => fail(err)
+);
+
+// bounce/stretch + gentle rotate
 const BPM = 145;
-const squash = 0.6;
+const squashAmt = 0.55;
+const rotateSpeed = 0.55;
 
-function pulse(x){ return 0.5 - 0.5*Math.cos(x*Math.PI*2); }
-
-function resize(){
-  const r = canvas.getBoundingClientRect();
-  renderer.setSize(r.width,r.height,false);
-  camera.aspect = r.width/r.height;
-  camera.updateProjectionMatrix();
+function smoothPulse(x){
+  return 0.5 - 0.5 * Math.cos(x * Math.PI * 2);
 }
-addEventListener("resize",resize);
-resize();
 
 function animate(){
   requestAnimationFrame(animate);
-  if(pig){
-    const t = performance.now()*0.001;
-    const beat = 60/BPM;
-    const p = pulse((t/beat)%1);
 
-    pig.scale.set(
-      baseScale.x*(1+(squash-p)*1.2),
-      baseScale.y*(1+p*2.0),
-      baseScale.z*(1+(squash-p)*1.2)
-    );
+  if (pivot) {
+    const t = performance.now() * 0.001;
+    const beat = 60 / BPM;
+    const phase = (t / beat) % 1;
+    const p = smoothPulse(phase);
 
-    pig.rotation.y = t*0.6;
+    const stretch = p * squashAmt;
+
+    const sx = 1 + (squashAmt - stretch) * 1.25;
+    const sy = 1 + stretch * 1.90;
+    const sz = 1 + (squashAmt - stretch) * 1.25;
+
+    pivot.scale.set(baseScale.x * sx, baseScale.y * sy, baseScale.z * sz);
+    pivot.rotation.y = t * rotateSpeed;
   }
-  renderer.render(scene,camera);
+
+  renderer.render(scene, camera);
 }
+
+resize();
 animate();
 </script>
 </body>
