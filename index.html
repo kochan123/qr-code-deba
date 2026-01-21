@@ -165,6 +165,9 @@ canvas{
 
   <div id="status">booting…</div>
 
+  <!-- ✅ MUSIC (put your file at assets/music.mp3) -->
+  <audio id="bgm" src="assets/music.mp3" loop preload="auto"></audio>
+
 <script type="module">
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
@@ -172,6 +175,33 @@ import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 
 const statusEl = document.getElementById("status");
 const canvas = document.getElementById("pig");
+
+/* ✅ AUDIO: MAX allowed + keep trying */
+const audio = document.getElementById("bgm");
+audio.volume = 1.0; // max allowed by browser
+
+let audioStarted = false;
+function startAudio(){
+  if (audioStarted && !audio.paused) return;
+  audioStarted = true;
+  audio.play().catch(()=>{ /* blocked until first interaction */ });
+}
+
+// try once (may work on some browsers)
+startAudio();
+
+// guaranteed start on first interaction
+["pointerdown","click","touchstart","keydown"].forEach(evt=>{
+  window.addEventListener(evt, startAudio, { once:true });
+});
+
+// keep it alive (if browser pauses it)
+setInterval(()=>{ if (audio.paused) startAudio(); }, 1500);
+
+// resume when tab returns
+document.addEventListener("visibilitychange", ()=>{
+  if (!document.hidden) startAudio();
+});
 
 function fail(e){
   console.error(e);
@@ -191,7 +221,7 @@ light.position.set(2,3,2);
 scene.add(light);
 
 let pig = null;
-let pivot = null;              // we rotate/scale this
+let pivot = null;
 let baseScale = new THREE.Vector3(1,1,1);
 let modelSize = new THREE.Vector3(1,1,1);
 
@@ -246,25 +276,19 @@ loader.load(
   (gltf) => {
     pig = gltf.scene;
 
-    // Put model inside a pivot Group so it always rotates about center
     pivot = new THREE.Group();
     pivot.add(pig);
     scene.add(pivot);
 
-    // Center the MODEL at origin (inside pivot)
     box.setFromObject(pig);
     box.getSize(modelSize);
     box.getCenter(center);
     pig.position.sub(center);
 
-    // Anchor model visually to bottom of the canvas area:
-    // Move it DOWN by half its height, so feet are near bottom,
-    // then lift it a tiny bit to avoid clipping.
     const halfH = modelSize.y / 2;
     pig.position.y -= halfH;
     pig.position.y += modelSize.y * 0.06;
 
-    // Save scale baseline
     baseScale.copy(pivot.scale);
 
     resize();
