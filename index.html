@@ -5,119 +5,143 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Деба</title>
 
-  <!-- Block Google -->
   <meta name="robots" content="noindex, nofollow">
 
   <style>
-    body {
-      margin: 0;
-      background: #b6f5c2; /* light green */
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
+    :root { --bg: #D6E0AC; }
+
+    body{
+      margin:0;
+      height:100vh;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      justify-content:center;
+      background: var(--bg);
+      overflow:hidden;
       font-family: system-ui, sans-serif;
-      overflow: hidden;
     }
-    h1 {
-      font-size: clamp(48px, 8vw, 96px);
-      margin: 0 0 18px 0;
-      letter-spacing: 2px;
-      color: rgba(0,0,0,0.55);
-      user-select: none;
+
+    /* Your “Деба” image */
+    #debaLogo{
+      width: min(720px, 88vw);
+      height: auto;
+      margin-bottom: 14px;
+      user-select:none;
+      -webkit-user-drag:none;
     }
-    canvas {
-      width: min(360px, 80vw);
-      height: min(360px, 80vw);
+
+    canvas{
+      width: min(420px, 80vw);
+      height: min(420px, 80vw);
       touch-action: manipulation;
     }
-    .hint {
+
+    #hint{
       margin-top: 10px;
       font-size: 14px;
-      color: rgba(0,0,0,0.45);
-      user-select: none;
+      opacity: 0.6;
+      user-select:none;
+    }
+
+    #status{
+      position: fixed;
+      bottom: 10px;
+      left: 10px;
+      font-size: 12px;
+      opacity: 0.65;
+      user-select:none;
     }
   </style>
 </head>
+
 <body>
+  <img id="debaLogo" src="assets/deba.png" alt="Деба" />
+  <canvas id="pig"></canvas>
+  <div id="hint">tap = turbo 🐷</div>
+  <div id="status"></div>
 
-<h1>Деба</h1>
-<canvas id="pig"></canvas>
-<div class="hint">tap = turbo 🐷</div>
+  <script src="https://unpkg.com/three@0.158.0/build/three.min.js"></script>
+  <script src="https://unpkg.com/three@0.158.0/examples/js/loaders/GLTFLoader.js"></script>
 
-<script src="https://unpkg.com/three@0.158.0/build/three.min.js"></script>
-<script src="https://unpkg.com/three@0.158.0/examples/js/loaders/GLTFLoader.js"></script>
+  <script>
+    const statusEl = document.getElementById("status");
+    const canvas = document.getElementById("pig");
 
-<script>
-  const canvas = document.getElementById("pig");
+    const scene = new THREE.Scene();
 
-  const scene = new THREE.Scene();
+    const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 
-  const renderer = new THREE.WebGLRenderer({ canvas, alpha: true, antialias: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 1000);
+    camera.position.set(0, 0.2, 2.8);
 
-  const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 1000);
-  camera.position.set(0, 0.2, 3);
+    // lighting
+    scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+    const key = new THREE.DirectionalLight(0xffffff, 1.0);
+    key.position.set(2, 2, 2);
+    scene.add(key);
 
-  // Lights (so it doesn’t look flat)
-  scene.add(new THREE.AmbientLight(0xffffff, 0.65));
-  const key = new THREE.DirectionalLight(0xffffff, 1.0);
-  key.position.set(2, 2, 2);
-  scene.add(key);
-
-  // Fit canvas to CSS size
-  function resize() {
-    const rect = canvas.getBoundingClientRect();
-    const w = Math.max(1, Math.floor(rect.width));
-    const h = Math.max(1, Math.floor(rect.height));
-    renderer.setSize(w, h, false);
-    camera.aspect = w / h;
-    camera.updateProjectionMatrix();
-  }
-  window.addEventListener("resize", resize);
-
-  // Load pig model (CDN-safe; raw.githubusercontent often fails on Pages)
-  const loader = new THREE.GLTFLoader();
-  let pig = null;
-
-  loader.load(
-    "https://cdn.jsdelivr.net/gh/KhronosGroup/glTF-Sample-Models@master/2.0/Pig/glTF/Pig.gltf",
-    (gltf) => {
-      pig = gltf.scene;
-      pig.scale.set(1.4, 1.4, 1.4);
-      pig.position.y = -0.25;
-      scene.add(pig);
-      resize();
-    },
-    undefined,
-    (err) => {
-      console.error("Pig failed to load:", err);
+    function resize(){
+      const r = canvas.getBoundingClientRect();
+      const w = Math.max(1, Math.floor(r.width));
+      const h = Math.max(1, Math.floor(r.height));
+      renderer.setSize(w, h, false);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
     }
-  );
+    window.addEventListener("resize", resize);
 
-  // Spin control: base spin + turbo on tap/click
-  let spin = 0.012;       // normal speed
-  let turbo = 0.0;        // extra speed that decays
+    let pig = null;
 
-  function boost() {
-    turbo = Math.min(turbo + 0.08, 0.25);
-  }
-  window.addEventListener("pointerdown", boost);
+    const loader = new THREE.GLTFLoader();
+    statusEl.textContent = "loading pig...";
 
-  function animate() {
-    requestAnimationFrame(animate);
+    loader.load(
+      "assets/pig.glb",
+      (gltf) => {
+        pig = gltf.scene;
+        pig.rotation.y = Math.PI * 0.2;
 
-    const speed = spin + turbo;
-    turbo *= 0.92; // decay
+        // tweak these if needed
+        pig.scale.set(1.2, 1.2, 1.2);
+        pig.position.y = -0.35;
 
-    if (pig) pig.rotation.y += speed;
-    renderer.render(scene, camera);
-  }
+        scene.add(pig);
+        statusEl.textContent = "";
+        resize();
+      },
+      (xhr) => {
+        if (xhr.total) {
+          const pct = Math.round((xhr.loaded / xhr.total) * 100);
+          statusEl.textContent = `loading pig... ${pct}%`;
+        }
+      },
+      (err) => {
+        console.error(err);
+        statusEl.textContent = "pig failed to load (check assets/pig.glb path)";
+      }
+    );
 
-  resize();
-  animate();
-</script>
+    // turbo spin
+    let base = 0.012;
+    let turbo = 0.0;
 
+    function boost(){
+      turbo = Math.min(turbo + 0.10, 0.30);
+    }
+    window.addEventListener("pointerdown", boost);
+
+    function animate(){
+      requestAnimationFrame(animate);
+      turbo *= 0.92;
+
+      if (pig) pig.rotation.y += (base + turbo);
+      renderer.render(scene, camera);
+    }
+
+    resize();
+    animate();
+  </script>
 </body>
 </html>
