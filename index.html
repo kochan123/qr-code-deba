@@ -9,7 +9,7 @@
 <style>
 :root{
   --bg:#D6E0AC;
-  --pink: rgba(220, 120, 190, 0.75); /* light but visible pink */
+  --pink: rgba(220, 120, 190, 0.78);
 }
 
 body{
@@ -51,17 +51,26 @@ body{
   bottom:0;
   display:flex;
   justify-content:center;
-  transform: translateY(100%);
+  transform: translateY(110%);
+  opacity:0;              /* start hidden */
+  transition: opacity 2.2s ease; /* gradual start */
+}
+
+#crawlWrap.show{
+  opacity:1;
 }
 
 .crawl{
   width:min(900px,92vw);
   color:var(--pink);
   font-size:clamp(15px,2vw,24px);
-  font-weight:600;
+  font-weight:650;
   line-height:1.6;
   text-align:center;
   white-space:pre-line;
+  text-shadow:
+    0 1px 0 rgba(0,0,0,0.05),
+    0 0 10px rgba(180,70,150,0.16);
 }
 
 /* STATUS */
@@ -86,8 +95,8 @@ body{
   align-items:center;
   justify-content:center;
   font-size:32px;
-  font-weight:800;
-  color:rgba(40,40,40,0.8);
+  font-weight:900;
+  color:rgba(40,40,40,0.82);
   cursor:pointer;
   z-index:10;
   user-select:none;
@@ -108,7 +117,6 @@ body{
 </div>
 
 <div id="status">loading…</div>
-
 <div id="uwu">~ UwU ~</div>
 
 <audio id="bgm" src="assets/music.mp3" loop preload="auto"></audio>
@@ -124,74 +132,129 @@ const logo = document.getElementById("debaLogo");
 
 audio.volume = 1.0;
 
-let durationMs = 203000;
-let startTime = null;
-let raf = null;
+let textReady = false;
+let audioReady = false;
+let running = false;
 
-/* POSITION CRAWL UNDER LOGO */
+let durationMs = 203000; // fallback
+let raf = null;
+let startTime = 0;
+
 function setMiddleTop(){
   const r = logo.getBoundingClientRect();
   middle.style.top = `${r.bottom + 20}px`;
 }
 
-/* LOAD TEXT FROM FILE */
+/* Load text from assets/text.txt */
 fetch("assets/text.txt")
   .then(r => r.text())
-  .then(t => crawlText.textContent = t)
-  .catch(() => crawlText.textContent = "failed to load text");
+  .then(t => {
+    crawlText.textContent = t.trim();
+    textReady = true;
+    statusEl.textContent = "text ok";
+    maybeStart();
+  })
+  .catch(() => {
+    crawlText.textContent = "failed to load assets/text.txt";
+    textReady = true;
+    maybeStart();
+  });
 
-/* START CRAWL */
-function startCrawl(){
+/* Wait for real audio duration */
+audio.addEventListener("loadedmetadata", ()=>{
+  if (isFinite(audio.duration) && audio.duration > 1) {
+    durationMs = audio.duration * 1000;
+  }
+  audioReady = true;
+  maybeStart();
+});
+
+function startCrawlSynced(){
   cancelAnimationFrame(raf);
   setMiddleTop();
 
+  // force layout so heights are correct
   const winH = middle.getBoundingClientRect().height;
   const textH = crawlText.getBoundingClientRect().height;
 
   const startY = winH + 20;
-  const endY = -textH - 40;
+  const endY   = -textH - 40;
 
-  startTime = performance.now();
+  // gradual reveal
+  crawlWrap.classList.remove("show");
+  crawlWrap.style.transform = `translateY(${startY}px)`;
+
+  // sync to audio: startTime tracks the same timeline as audio currentTime
+  // if audio is at 0.0 it starts from the bottom; if not, it resumes correctly
+  startTime = performance.now() - (audio.currentTime * 1000);
+
+  // fade in after a tiny delay so it feels like “starts gradually”
+  setTimeout(()=> crawlWrap.classList.add("show"), 80);
 
   function step(now){
-    const p = ((now - startTime) % durationMs) / durationMs;
+    // progress based on audio time so it stays locked even if browser stutters
+    const tMs = (audio.currentTime * 1000) % durationMs;
+    const p = tMs / durationMs;
+
     const y = startY + (endY - startY) * p;
     crawlWrap.style.transform = `translateY(${y}px)`;
+
     raf = requestAnimationFrame(step);
   }
   raf = requestAnimationFrame(step);
 }
 
-/* TRY PLAY AUDIO */
+function maybeStart(){
+  if (running) return;
+  if (!textReady) return;
+
+  // We only start the crawl when audio is actually playing.
+  // If autoplay is blocked, you’ll see UwU.
+  tryPlay();
+}
+
 async function tryPlay(){
+  if (running) return;
+
   try{
     await audio.play();
     uwu.style.display = "none";
     statusEl.textContent = "music on";
-    startCrawl();
+    running = true;
+
+    // Only now start crawl (synced)
+    startCrawlSynced();
   }catch{
     uwu.style.display = "flex";
     statusEl.textContent = "tap UwU";
   }
 }
 
-audio.addEventListener("loadedmetadata", ()=>{
-  if (audio.duration > 1) durationMs = audio.duration * 1000;
-});
-
-/* UWU = USER GESTURE */
+/* UwU is the unlock */
 uwu.addEventListener("pointerdown", tryPlay);
 window.addEventListener("keydown", tryPlay);
 window.addEventListener("pointerdown", tryPlay, { once:true });
 
-/* RETRY WHEN TAB RETURNS */
-document.addEventListener("visibilitychange", ()=>{
-  if (!document.hidden) tryPlay();
+/* Keep it aligned */
+window.addEventListener("resize", ()=>{
+  setMiddleTop();
+  if (running) startCrawlSynced();
 });
 
-/* INIT */
-window.addEventListener("resize", ()=>{ if (!audio.paused) startCrawl(); });
-window.addEventListener("load", ()=>{ setMiddleTop(); tryPlay(); });
+document.addEventListener("visibilitychange", ()=>{
+  if (!document.hidden && audio.paused) {
+    running = false;
+    tryPlay();
+  }
+});
+
+/* Init */
+window.addEventListener("load", ()=>{
+  setMiddleTop();
+  // even if metadata isn't ready yet, tryPlay will run;
+  // crawl waits for audio actually playing
+  tryPlay();
+});
 </script>
 
 </body>
