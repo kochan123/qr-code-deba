@@ -7,7 +7,10 @@
 <meta name="robots" content="noindex, nofollow" />
 
 <style>
-:root { --bg:#D6E0AC; }
+:root{
+  --bg:#D6E0AC;
+  --crawl-color: rgba(170, 70, 140, 0.65);
+}
 
 body{
   margin:0;
@@ -36,7 +39,7 @@ body{
 #middle{
   position:absolute;
   top:20%;
-  bottom:30%;
+  bottom:10%;
   left:0; right:0;
   display:flex;
   justify-content:center;
@@ -46,38 +49,27 @@ body{
 }
 .crawl{
   width:min(900px,92vw);
-  color:rgba(40,40,40,0.55);
-  font-size:clamp(14px,2vw,22px);
+  color:var(--crawl-color);
+  font-size:clamp(15px,2.1vw,24px);
   font-weight:600;
-  line-height:1.55;
+  line-height:1.6;
   text-align:center;
   white-space:pre-line;
+
   transform-origin:50% 100%;
   transform:rotateX(55deg) translateY(60vh);
   animation:crawlMove 203s linear infinite;
+
+  text-shadow:
+    0 1px 0 rgba(0,0,0,0.05),
+    0 0 6px rgba(120,40,100,0.15);
 }
 @keyframes crawlMove{
   from { transform:rotateX(55deg) translateY(60vh); }
   to   { transform:rotateX(55deg) translateY(-240vh); }
 }
 
-/* BOTTOM: PIG */
-#bottom{
-  position:absolute;
-  bottom:0;
-  left:0; right:0;
-  height:30vh;
-  display:flex;
-  justify-content:center;
-  align-items:flex-end;
-  z-index:3;
-}
-canvas{
-  width:min(520px,92vw);
-  height:100%;
-  touch-action: manipulation;
-}
-
+/* STATUS */
 #status{
   position:fixed;
   bottom:10px;
@@ -88,27 +80,48 @@ canvas{
   border-radius:8px;
   background:rgba(255,255,255,0.35);
   user-select:none;
-  z-index:4;
+  z-index:6;
+}
+
+/* AUDIO UNLOCK OVERLAY */
+#unlock{
+  position:fixed;
+  inset:0;
+  z-index:10;
+  display:none;            /* only shown if autoplay is blocked */
+  align-items:center;
+  justify-content:center;
+  background:rgba(0,0,0,0.0); /* set to 0.35 if you want dim */
+  cursor:pointer;
+}
+#unlockBox{
+  padding:14px 16px;
+  border-radius:14px;
+  background:rgba(255,255,255,0.55);
+  backdrop-filter: blur(6px);
+  font-weight:700;
+  color:#111;
+  user-select:none;
+  text-align:center;
+}
+#unlockSmall{
+  display:block;
+  margin-top:6px;
+  font-weight:500;
+  opacity:.75;
+  font-size:12px;
 }
 </style>
-
-<script type="importmap">
-{
-  "imports": {
-    "three": "https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.module.js",
-    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.158.0/examples/jsm/"
-  }
-}
-</script>
 </head>
 
 <body>
-  <div id="top">
-    <img id="debaLogo" src="assets/deba.png" alt="Деба">
-  </div>
 
-  <div id="middle">
-    <div class="crawl">
+<div id="top">
+  <img id="debaLogo" src="assets/deba.png" alt="Деба">
+</div>
+
+<div id="middle">
+  <div class="crawl">
 Словото, словото на мечовете
 Словото е словото на мечовете… за да бъдат възстановени несправедливостите
 Дори низките се надигнаха… пратеникът на решителните
@@ -146,193 +159,64 @@ canvas{
 Нашият пратеник е слънцето на истината… осветил лицето на световете
 Словото е словото на мечовете… за да бъдат възстановени несправедливостите
 Дори низките се надигнаха… пратеникът на народа на решимостта
-
-Словото, словото на мечовете
-Словото е словото на мечовете… за да бъдат възстановени несправедливостите
-Дори низките се надигнаха… пратеникът на народа на решимостта
-
-Словото, словото на мечовете
-Словото е словото на мечовете… за да бъдат възстановени несправедливостите
-Дори низките се надигнаха… пратеникът на народа на решимостта
-
-Словото, словото на мечовете
-    </div>
   </div>
+</div>
 
-  <div id="bottom">
-    <canvas id="pig"></canvas>
+<div id="status">ready</div>
+
+<!-- AUDIO -->
+<audio id="bgm" src="assets/music.mp3" loop preload="auto"></audio>
+
+<!-- shown only if autoplay is blocked -->
+<div id="unlock" aria-hidden="true">
+  <div id="unlockBox">
+    TAP ANYWHERE TO START 🔊
+    <span id="unlockSmall">(browser blocks autoplay)</span>
   </div>
+</div>
 
-  <div id="status">booting…</div>
-
-  <!-- ✅ MUSIC (put your file at assets/music.mp3) -->
-  <audio id="bgm" src="assets/music.mp3" loop preload="auto"></audio>
-
-<script type="module">
-import * as THREE from "three";
-import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
-import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
-
+<script>
 const statusEl = document.getElementById("status");
-const canvas = document.getElementById("pig");
-
-/* ✅ AUDIO: MAX allowed + keep trying */
 const audio = document.getElementById("bgm");
+const unlock = document.getElementById("unlock");
+
 audio.volume = 1.0; // max allowed by browser
 
-let audioStarted = false;
-function startAudio(){
-  if (audioStarted && !audio.paused) return;
-  audioStarted = true;
-  audio.play().catch(()=>{ /* blocked until first interaction */ });
-}
-
-// try once (may work on some browsers)
-startAudio();
-
-// guaranteed start on first interaction
-["pointerdown","click","touchstart","keydown"].forEach(evt=>{
-  window.addEventListener(evt, startAudio, { once:true });
-});
-
-// keep it alive (if browser pauses it)
-setInterval(()=>{ if (audio.paused) startAudio(); }, 1500);
-
-// resume when tab returns
-document.addEventListener("visibilitychange", ()=>{
-  if (!document.hidden) startAudio();
-});
-
-function fail(e){
-  console.error(e);
-  statusEl.textContent = "ERROR: " + (e?.message || e);
-  statusEl.style.color = "crimson";
-}
-
-const scene = new THREE.Scene();
-const renderer = new THREE.WebGLRenderer({ canvas, alpha:true, antialias:true });
-renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
-
-const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 10000);
-
-scene.add(new THREE.AmbientLight(0xffffff,0.85));
-const light = new THREE.DirectionalLight(0xffffff,1.1);
-light.position.set(2,3,2);
-scene.add(light);
-
-let pig = null;
-let pivot = null;
-let baseScale = new THREE.Vector3(1,1,1);
-let modelSize = new THREE.Vector3(1,1,1);
-
-const box = new THREE.Box3();
-const size = new THREE.Vector3();
-const center = new THREE.Vector3();
-
-function fitCameraToObject(obj, fitOffset = 1.25){
-  box.setFromObject(obj);
-  box.getSize(size);
-  box.getCenter(center);
-
-  const maxDim = Math.max(size.x, size.y, size.z);
-  const fov = THREE.MathUtils.degToRad(camera.fov);
-  const aspect = camera.aspect;
-
-  const distV = (maxDim / 2) / Math.tan(fov / 2);
-  const fovH = 2 * Math.atan(Math.tan(fov / 2) * aspect);
-  const distH = (maxDim / 2) / Math.tan(fovH / 2);
-
-  const dist = Math.max(distV, distH) * fitOffset;
-
-  camera.position.set(0, maxDim * 0.10, dist);
-  camera.near = dist / 100;
-  camera.far  = dist * 100;
-  camera.lookAt(0, 0, 0);
-  camera.updateProjectionMatrix();
-}
-
-function resize(){
-  const r = canvas.getBoundingClientRect();
-  const w = Math.max(1, Math.floor(r.width));
-  const h = Math.max(1, Math.floor(r.height));
-  renderer.setSize(w, h, false);
-  camera.aspect = w / h;
-  camera.updateProjectionMatrix();
-
-  if (pivot) fitCameraToObject(pivot, 1.35);
-}
-addEventListener("resize", resize);
-
-// loaders
-const loader = new GLTFLoader();
-const draco = new DRACOLoader();
-draco.setDecoderPath("https://www.gstatic.com/draco/v1/decoders/");
-loader.setDRACOLoader(draco);
-
-statusEl.textContent = "loading pig…";
-
-loader.load(
-  "assets/pig.glb",
-  (gltf) => {
-    pig = gltf.scene;
-
-    pivot = new THREE.Group();
-    pivot.add(pig);
-    scene.add(pivot);
-
-    box.setFromObject(pig);
-    box.getSize(modelSize);
-    box.getCenter(center);
-    pig.position.sub(center);
-
-    const halfH = modelSize.y / 2;
-    pig.position.y -= halfH;
-    pig.position.y += modelSize.y * 0.06;
-
-    baseScale.copy(pivot.scale);
-
-    resize();
-    fitCameraToObject(pivot, 1.35);
-
-    statusEl.textContent = "";
-  },
-  undefined,
-  (err) => fail(err)
-);
-
-// bounce/stretch + gentle rotate
-const BPM = 145;
-const squashAmt = 0.55;
-const rotateSpeed = 0.55;
-
-function smoothPulse(x){
-  return 0.5 - 0.5 * Math.cos(x * Math.PI * 2);
-}
-
-function animate(){
-  requestAnimationFrame(animate);
-
-  if (pivot) {
-    const t = performance.now() * 0.001;
-    const beat = 60 / BPM;
-    const phase = (t / beat) % 1;
-    const p = smoothPulse(phase);
-
-    const stretch = p * squashAmt;
-
-    const sx = 1 + (squashAmt - stretch) * 1.25;
-    const sy = 1 + stretch * 1.90;
-    const sz = 1 + (squashAmt - stretch) * 1.25;
-
-    pivot.scale.set(baseScale.x * sx, baseScale.y * sy, baseScale.z * sz);
-    pivot.rotation.y = t * rotateSpeed;
+async function tryPlay() {
+  try {
+    await audio.play();
+    // success
+    unlock.style.display = "none";
+    statusEl.textContent = "music on";
+  } catch (e) {
+    // blocked until user gesture
+    unlock.style.display = "flex";
+    statusEl.textContent = "tap to enable sound";
   }
-
-  renderer.render(scene, camera);
 }
 
-resize();
-animate();
+// Try immediately (works only on some browsers/settings)
+tryPlay();
+
+// One-tap unlock: ANY tap/click anywhere
+function userGestureStart(){
+  tryPlay();
+}
+unlock.addEventListener("pointerdown", userGestureStart);
+window.addEventListener("pointerdown", userGestureStart, { once:false });
+window.addEventListener("keydown", userGestureStart, { once:false });
+
+// Keep alive (some browsers pause background audio)
+setInterval(() => {
+  if (!document.hidden && audio.paused) {
+    tryPlay();
+  }
+}, 1500);
+
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) tryPlay();
+});
 </script>
+
 </body>
 </html>
