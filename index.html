@@ -57,8 +57,33 @@ body{
   text-shadow:
     0 1px 0 rgba(0,0,0,0.05),
     0 0 10px rgba(180,70,150,0.18);
-  opacity:0;              /* HIDDEN until music plays */
+  opacity:0;              /* hidden until music plays */
   transition: opacity .8s ease;
+}
+
+/* JACK IMAGES (spawn from bottom, then stay) */
+.spawn{
+  position:fixed;
+  bottom:18px;
+  width:min(120px,22vw);
+  height:auto;
+  opacity:0;
+  transform: translateY(140px);
+  transition:
+    transform 900ms cubic-bezier(.2,.9,.2,1),
+    opacity 700ms ease;
+  z-index:4;
+  pointer-events:none;
+  user-select:none;
+  -webkit-user-drag:none;
+}
+
+#jackLeft{ left:18px; }
+#jackRight{ right:18px; }
+
+body.started .spawn{
+  opacity:1;
+  transform: translateY(0);
 }
 
 /* UWU unlock */
@@ -99,6 +124,10 @@ body{
   <img id="debaLogo" src="assets/deba.png" alt="Деба">
 </div>
 
+<!-- spawn images (hidden until started) -->
+<img id="jackLeft" class="spawn" src="assets/isisjack.png" alt="">
+<img id="jackRight" class="spawn" src="assets/isisjack_flipped.png" alt="">
+
 <div id="crawlArea">
   <div id="crawl"></div>
 </div>
@@ -121,7 +150,7 @@ let started = false;
 let durationMs = 203000; // fallback
 let raf = null;
 
-/* load text BUT keep it invisible until music actually plays */
+/* load text (still invisible until start) */
 fetch("assets/text.txt")
   .then(r => r.text())
   .then(t => {
@@ -152,7 +181,6 @@ function startScroll(){
   crawl.style.opacity = "1";
 
   function step(){
-    // sync to audio time
     const tMs = (music.currentTime * 1000) % durationMs;
     const p = tMs / durationMs;
     const y = startY + (endY - startY) * p;
@@ -163,13 +191,8 @@ function startScroll(){
   raf = requestAnimationFrame(step);
 }
 
-function hideUwu(){
-  uwu.style.display = "none";
-}
-
-function showUwu(){
-  uwu.style.display = "flex";
-}
+function hideUwu(){ uwu.style.display = "none"; }
+function showUwu(){ uwu.style.display = "flex"; }
 
 async function tryStart(){
   if (started) return;
@@ -178,30 +201,29 @@ async function tryStart(){
   statusEl.textContent = "starting…";
 
   try{
-    await music.play();         // will throw if blocked
+    await music.play();              // blocked until gesture on most browsers
     started = true;
+
+    // mark started -> images spawn & stay
+    document.body.classList.add("started");
+
     hideUwu();
     statusEl.textContent = "music on";
     startScroll();
   }catch{
-    // autoplay blocked -> show UwU and keep crawl hidden
     showUwu();
     crawl.style.opacity = "0";
     statusEl.textContent = "tap UwU";
   }
 }
 
-/* only the UwU click starts it */
-uwu.addEventListener("pointerdown", ()=> {
-  tryStart();
-});
+/* only UwU click starts it */
+uwu.addEventListener("pointerdown", tryStart);
 
-/* attempt autoplay once on load (will fail on most browsers) */
-window.addEventListener("load", ()=> {
-  tryStart();
-});
+/* attempt autoplay once on load */
+window.addEventListener("load", tryStart);
 
-/* keep it aligned on resize */
+/* keep aligned on resize */
 window.addEventListener("resize", ()=>{
   if (started) startScroll();
 });
